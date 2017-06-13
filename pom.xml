@@ -8,16 +8,42 @@
     <artifactId>kafka-connect-elasticsearch</artifactId>
     <version>3.5.0-SNAPSHOT</version>
 
+    <parent>
+        <groupId>com.autonomic</groupId>
+        <artifactId>au-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>LICENSE</url>
+        </license>
+    </licenses>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.autonomic</groupId>
+                <artifactId>au-dependencies</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <properties>
         <confluent.version>3.5.0-SNAPSHOT</confluent.version>
-        <kafka.version>0.11.1.0-SNAPSHOT</kafka.version>
+        <kafka.version>0.10.2.1</kafka.version>
         <junit.version>4.12</junit.version>
         <es.version>2.4.1</es.version>
         <lucene.version>5.5.2</lucene.version>
         <slf4j.version>1.7.5</slf4j.version>
         <jna.version>4.2.1</jna.version>
         <hamcrest.version>2.0.0.0</hamcrest.version>
-        <jest.version>2.0.0</jest.version>
+        <jest.version>5.3.2</jest.version>
         <licenses.version>3.5.0-SNAPSHOT</licenses.version>
         <confluent.maven.repo>http://packages.confluent.io/maven/</confluent.maven.repo>
     </properties>
@@ -107,6 +133,57 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>docs/**</exclude>
+                        <exclude>pom.xml</exclude>
+                        <exclude>src/assembly/**</exclude>
+                        <exclude>notices/**</exclude>
+                        <exclude>README.md</exclude>
+                        <exclude>THIRD-PARTY.csv</exclude>
+                        <exclude>version.txt</exclude>
+                        <exclude>licenses/**</exclude>
+                        <exclude>Jenkinsfile</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jfrog.buildinfo</groupId>
+                <artifactId>artifactory-maven-plugin</artifactId>
+                <version>${artifactory-maven-plugin.version}</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>publish</goal>
+                        </goals>
+                        <configuration>
+                            <publisher>
+                                <contextUrl>https://autonomic.jfrog.io/autonomic</contextUrl>
+                                <repoKey>libs-release-local</repoKey>
+                                <snapshotRepoKey>libs-snapshot-local</snapshotRepoKey>
+                                <username>build</username>
+                                <password>{{ARTIFACTORY_PASSWORD}}</password>
+                            </publisher>
+                            <deployProperties>
+                                <groupId>${project.groupId}</groupId>
+                                <artifactId>${project.artifactId}</artifactId>
+                                <version>${project.version}</version>
+                            </deployProperties>
+                            <buildInfo>
+                                <buildNumber>${build-number}</buildNumber>
+                            </buildInfo>
+                            <licenses>
+                                <autoDiscover>true</autoDiscover>
+                            </licenses>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
