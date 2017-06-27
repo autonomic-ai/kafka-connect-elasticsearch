@@ -17,19 +17,17 @@ package io.confluent.connect.elasticsearch;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
+import io.confluent.connect.elasticsearch.bulk.BulkClient;
+import io.confluent.connect.elasticsearch.bulk.BulkResponse;
+import io.searchbox.client.JestClient;
+import io.searchbox.core.Bulk;
+import io.searchbox.core.BulkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import io.confluent.connect.elasticsearch.bulk.BulkClient;
-import io.confluent.connect.elasticsearch.bulk.BulkResponse;
-import io.searchbox.client.JestClient;
-import io.searchbox.core.Bulk;
-import io.searchbox.core.BulkResult;
 
 public class BulkIndexingClient implements BulkClient<IndexableRecord, Bulk> {
 
@@ -47,7 +45,7 @@ public class BulkIndexingClient implements BulkClient<IndexableRecord, Bulk> {
   public Bulk bulkRequest(List<IndexableRecord> batch) {
     final Bulk.Builder builder = new Bulk.Builder();
     for (IndexableRecord record : batch) {
-      builder.addAction(record.toIndexRequest());
+      builder.addAction(record.toBulkableAction());
     }
     return builder.build();
   }

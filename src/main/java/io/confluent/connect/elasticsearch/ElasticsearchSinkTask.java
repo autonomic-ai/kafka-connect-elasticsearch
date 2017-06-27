@@ -16,6 +16,9 @@
 
 package io.confluent.connect.elasticsearch;
 
+import io.searchbox.client.JestClient;
+import io.searchbox.client.JestClientFactory;
+import io.searchbox.client.config.HttpClientConfig;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
@@ -32,15 +35,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.searchbox.client.JestClient;
-import io.searchbox.client.JestClientFactory;
-import io.searchbox.client.config.HttpClientConfig;
-
 public class ElasticsearchSinkTask extends SinkTask {
+
+  public static final String CREATE_INDEX_AT_OPEN = "atOpen";
+  public static final String CREATE_INDEX_AT_WRITE = "atWrite";
 
   private static final Logger log = LoggerFactory.getLogger(ElasticsearchSinkTask.class);
   private ElasticsearchWriter writer;
   private JestClient client;
+  private String indexCreationStrategy = CREATE_INDEX_AT_OPEN;
 
   @Override
   public String version() {
@@ -72,15 +75,32 @@ public class ElasticsearchSinkTask extends SinkTask {
       long lingerMs = config.getLong(ElasticsearchSinkConnectorConfig.LINGER_MS_CONFIG);
       int maxInFlightRequests = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IN_FLIGHT_REQUESTS_CONFIG);
       long retryBackoffMs = config.getLong(ElasticsearchSinkConnectorConfig.RETRY_BACKOFF_MS_CONFIG);
+      int socketReadTimeoutMs = config.getInt(ElasticsearchSinkConnectorConfig.SOCKET_READ_TIMEOUT_MS_CONFIG);
       int maxRetry = config.getInt(ElasticsearchSinkConnectorConfig.MAX_RETRIES_CONFIG);
+      IndexConfigurationProvider indexConfigurationProvider = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.INDEX_CONFIGURATION_PROVIDER_CONFIG, IndexConfigurationProvider.class);
+      indexCreationStrategy = config.getString(ElasticsearchSinkConnectorConfig.INDEX_CREATION_STRATEGY_CONFIG);
+
+      switch (indexCreationStrategy) {
+        case CREATE_INDEX_AT_OPEN:
+            /* FALLTHROUGH */
+        case CREATE_INDEX_AT_WRITE:
+          break;
+        default:
+          log.warn("Ignoring unsupported index creation strategy: {}. defaulting to {}", indexCreationStrategy, CREATE_INDEX_AT_OPEN);
+          indexCreationStrategy = CREATE_INDEX_AT_OPEN;
+      }
 
       if (client != null) {
         this.client = client;
       } else {
         List<String> address = config.getList(ElasticsearchSinkConnectorConfig.CONNECTION_URL_CONFIG);
         JestClientFactory factory = new JestClientFactory();
-        factory.setHttpClientConfig(new HttpClientConfig.Builder(address).multiThreaded(true).build());
+        factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).multiThreaded(true).build());
         this.client = factory.getObject();
+      }
+
+      if (indexConfigurationProvider != null) {
+        indexConfigurationProvider.configure(props);
       }
 
       ElasticsearchWriter.Builder builder = new ElasticsearchWriter.Builder(this.client)
@@ -94,7 +114,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setBatchSize(batchSize)
           .setLingerMs(lingerMs)
           .setRetryBackoffMs(retryBackoffMs)
-          .setMaxRetry(maxRetry);
+          .setMaxRetry(maxRetry)
+          .setIndexConfigurationProvider(indexConfigurationProvider);
 
       writer = builder.build();
       writer.start();
@@ -103,26 +124,32 @@ public class ElasticsearchSinkTask extends SinkTask {
     }
   }
 
+
   @Override
   public void open(Collection<TopicPartition> partitions) {
     log.debug("Opening the task for topic partitions: {}", partitions);
-    Set<String> topics = new HashSet<>();
-    for (TopicPartition tp : partitions) {
-      topics.add(tp.topic());
-    }
-    writer.createIndicesForTopics(topics);
+    Set<String> topics = topicsFromPartitions(partitions);
+
+    if (indexCreationStrategy.equals(CREATE_INDEX_AT_OPEN))
+      writer.createIndicesForTopics(topics);
   }
 
   @Override
   public void put(Collection<SinkRecord> records) throws ConnectException {
     log.trace("Putting {} to Elasticsearch.", records);
+
+    if (records.size() > 0 && indexCreationStrategy.equals(CREATE_INDEX_AT_WRITE)) {
+      writer.createIndicesForRecords(records);
+    }
+
     writer.write(records);
   }
 
   @Override
   public void flush(Map<TopicPartition, OffsetAndMetadata> offsets) {
-    log.trace("Flushing data to Elasticsearch with the following offsets: {}", offsets);
+    log.debug("Flushing data to Elasticsearch with the following offsets: {}", offsets);
     writer.flush();
+    log.debug("Flush returned sucessfully.");
   }
 
   @Override
@@ -140,6 +167,16 @@ public class ElasticsearchSinkTask extends SinkTask {
       client.shutdownClient();
     }
   }
+
+  private Set<String> topicsFromPartitions(Collection<TopicPartition> partitions) {
+    Set<String> topics = new HashSet<>();
+    for (TopicPartition tp : partitions) {
+      topics.add(tp.topic());
+    }
+
+    return topics;
+  }
+
 
   private Map<String, String> parseMapConfig(List<String> values) {
     Map<String, String> map = new HashMap<>();

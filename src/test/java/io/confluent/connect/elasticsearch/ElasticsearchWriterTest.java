@@ -25,6 +25,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.joda.time.Instant;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -308,10 +309,18 @@ public class ElasticsearchWriterTest extends ElasticsearchSinkTestBase {
   }
 
   private ElasticsearchWriter initWriter(JestClient client, boolean ignoreKey, boolean ignoreSchema) {
-    return initWriter(client, ignoreKey, Collections.<String>emptySet(), ignoreSchema, Collections.<String>emptySet(), Collections.<String, String>emptyMap());
+    return initWriter(client, TOPIC, ignoreKey, Collections.<String>emptySet(), ignoreSchema, Collections.<String>emptySet(), Collections.<String, String>emptyMap(), null);
+  }
+
+  private ElasticsearchWriter initWriter(JestClient client, String indexName, boolean ignoreKey, boolean ignoreSchema, IndexConfigurationProvider indexConfigurationProvider) {
+    return initWriter(client, indexName, ignoreKey, Collections.<String>emptySet(), ignoreSchema, Collections.<String>emptySet(), Collections.<String, String>emptyMap(), indexConfigurationProvider);
   }
 
   private ElasticsearchWriter initWriter(JestClient client, boolean ignoreKey, Set<String> ignoreKeyTopics, boolean ignoreSchema, Set<String> ignoreSchemaTopics, Map<String, String> topicToIndexMap) {
+    return initWriter(client, TOPIC, ignoreKey, ignoreKeyTopics, ignoreSchema, ignoreSchemaTopics, topicToIndexMap, null);
+  }
+
+  private ElasticsearchWriter initWriter(JestClient client, String indexName, boolean ignoreKey, Set<String> ignoreKeyTopics, boolean ignoreSchema, Set<String> ignoreSchemaTopics, Map<String, String> topicToIndexMap, IndexConfigurationProvider indexConfigurationProvider) {
     ElasticsearchWriter writer = new ElasticsearchWriter.Builder(client)
         .setType(TYPE)
         .setIgnoreKey(ignoreKey, ignoreKeyTopics)
@@ -324,9 +333,11 @@ public class ElasticsearchWriterTest extends ElasticsearchSinkTestBase {
         .setLingerMs(1000)
         .setRetryBackoffMs(1000)
         .setMaxRetry(3)
+        .setIndexConfigurationProvider(indexConfigurationProvider)
         .build();
+
     writer.start();
-    writer.createIndicesForTopics(Collections.singleton(TOPIC));
+    writer.createIndicesForTopics(Collections.singleton(indexName));
     return writer;
   }
 
@@ -335,5 +346,31 @@ public class ElasticsearchWriterTest extends ElasticsearchSinkTestBase {
     writer.flush();
     writer.stop();
     refresh();
+  }
+
+  @Test
+  public void testCustomIndexConfigurationProvider() throws Exception {
+    final boolean ignoreKey = false;
+    final boolean ignoreSchema = false;
+
+    Schema structSchema = SchemaBuilder.struct().name("record")
+            .field("user", Schema.STRING_SCHEMA)
+            .field("message", Schema.STRING_SCHEMA)
+            .field("time", SchemaBuilder.INT64_SCHEMA)
+            .build();
+
+    Struct struct = new Struct(structSchema);
+    struct.put("user", "Liquan");
+    struct.put("message", "trying out Elastic Search.");
+    struct.put("time", Instant.now().getMillis());
+
+    Collection<SinkRecord> records = new ArrayList<>();
+    SinkRecord sinkRecord = new SinkRecord(TOPIC, PARTITION, Schema.STRING_SCHEMA, key, structSchema, struct, 0);
+    records.add(sinkRecord);
+
+    CustomIndexConfigurationProvider customIndexConfigurationProvider = new CustomIndexConfigurationProvider();
+    ElasticsearchWriter writer = initWriter(client, customIndexConfigurationProvider.getIndexName(sinkRecord), ignoreKey, ignoreSchema, customIndexConfigurationProvider);
+    writeDataAndRefresh(writer, records);
+    verifySearchResults(records, customIndexConfigurationProvider.getIndexName(sinkRecord), ignoreKey, ignoreSchema, customIndexConfigurationProvider);
   }
 }
