@@ -110,10 +110,14 @@ public class ElasticsearchSinkTestBase extends ESIntegTestCase {
   }
 
   protected void verifySearchResults(Collection<SinkRecord> records, boolean ignoreKey, boolean ignoreSchema) throws IOException {
-    verifySearchResults(records, TOPIC, ignoreKey, ignoreSchema);
+    verifySearchResults(records, TOPIC, ignoreKey, ignoreSchema, null);
   }
 
   protected void verifySearchResults(Collection<?> records, String index, boolean ignoreKey, boolean ignoreSchema) throws IOException {
+    verifySearchResults(records, index, ignoreKey, ignoreSchema, null);
+  }
+
+  protected void verifySearchResults(Collection<?> records, String index, boolean ignoreKey, boolean ignoreSchema, IndexConfigurationProvider indexConfigurationProvider) throws IOException {
     final SearchResult result = client.execute(new Search.Builder("").addIndex(index).build());
 
     final JsonArray rawHits = result.getJsonObject().getAsJsonObject("hits").getAsJsonArray("hits");
@@ -130,7 +134,7 @@ public class ElasticsearchSinkTestBase extends ESIntegTestCase {
 
     for (Object record : records) {
       if (record instanceof SinkRecord) {
-        IndexableRecord indexableRecord = DataConverter.convertRecord((SinkRecord) record, index, TYPE, ignoreKey, ignoreSchema);
+        IndexableRecord indexableRecord = DataConverter.convertRecord((SinkRecord) record, index, TYPE, ignoreKey, ignoreSchema, indexConfigurationProvider, null);
         assertEquals(indexableRecord.payload, hits.get(indexableRecord.key.id));
       } else {
         assertEquals(record, hits.get("key"));
@@ -147,5 +151,4 @@ public class ElasticsearchSinkTestBase extends ESIntegTestCase {
         .put(Node.HTTP_ENABLED, true)
         .build();
   }
-
 }

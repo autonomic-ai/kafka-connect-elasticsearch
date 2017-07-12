@@ -24,12 +24,17 @@ import org.apache.kafka.common.config.ConfigDef.Width;
 
 import java.util.Map;
 
+import static io.confluent.connect.elasticsearch.ElasticsearchSinkTask.CREATE_INDEX_AT_OPEN;
+import static io.confluent.connect.elasticsearch.ElasticsearchSinkTask.CREATE_INDEX_AT_WRITE;
+import static io.confluent.connect.elasticsearch.ElasticsearchSinkTask.DISABLE_MAX_IDLE_CONNECTION_TIMEOUT;
+
 public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
 
   public static final String CONNECTION_URL_CONFIG = "connection.url";
   public static final String BATCH_SIZE_CONFIG = "batch.size";
   public static final String MAX_IN_FLIGHT_REQUESTS_CONFIG = "max.in.flight.requests";
   public static final String MAX_BUFFERED_RECORDS_CONFIG = "max.buffered.records";
+  public static final String SOCKET_READ_TIMEOUT_MS_CONFIG = "socket.read.timeout.ms";
   public static final String LINGER_MS_CONFIG = "linger.ms";
   public static final String FLUSH_TIMEOUT_MS_CONFIG = "flush.timeout.ms";
   public static final String MAX_RETRIES_CONFIG = "max.retries";
@@ -40,6 +45,11 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
   public static final String TOPIC_KEY_IGNORE_CONFIG = "topic.key.ignore";
   public static final String SCHEMA_IGNORE_CONFIG = "schema.ignore";
   public static final String TOPIC_SCHEMA_IGNORE_CONFIG = "topic.schema.ignore";
+  public static final String INDEX_CONFIGURATION_PROVIDER_CONFIG = "index.configuration.provider";
+  public static final String INDEX_CREATION_STRATEGY_CONFIG = "index.creation.strategy";
+  public static final String CUSTOM_DOCUMENT_TRANSFORMER_CONFIG = "custom.document.transformer";
+  public static final String MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG = "max.idle.connection.timeout.ms";
+
 
   protected static ConfigDef baseConfigDef() {
     final ConfigDef configDef = new ConfigDef();
@@ -80,7 +90,15 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
           .define(RETRY_BACKOFF_MS_CONFIG, Type.LONG, 100L, Importance.LOW,
                   "How long to wait in milliseconds before attempting to retry a failed indexing request. "
                   + "This avoids retrying in a tight loop under failure scenarios.",
-                  group, ++order, Width.SHORT, "Retry Backoff (ms)");
+                  group, ++order, Width.SHORT, "Retry Backoff (ms)")
+          .define(SOCKET_READ_TIMEOUT_MS_CONFIG, Type.INT, 3000, Importance.LOW,
+                  "How long to wait in milliseconds before timing out on socket reads. Notably, this determines"
+                  + "How long to wait to receive responses from Elasticsearch servers.",
+                  group, ++order, Width.LONG, "Socket read timeout (ms)")
+          .define(MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG, Type.INT, DISABLE_MAX_IDLE_CONNECTION_TIMEOUT, Importance.LOW,
+                  "Limit the duration a connection to Elasticsearch may remain idle before being closed by the client. "
+                  + "(disabled by default)",
+                  group, ++order, Width.LONG, "Idle Connection timeout");
     }
 
     {
@@ -109,7 +127,16 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
                   group, ++order, Width.LONG, "Topics for 'Ignore Key' mode")
           .define(TOPIC_SCHEMA_IGNORE_CONFIG, Type.LIST, "", Importance.LOW,
                   "List of topics for which ``" + SCHEMA_IGNORE_CONFIG + "`` should be ``true``.",
-                  group, ++order, Width.LONG, "Topics for 'Ignore Schema' mode");
+                  group, ++order, Width.LONG, "Topics for 'Ignore Schema' mode")
+          .define(INDEX_CONFIGURATION_PROVIDER_CONFIG, Type.CLASS, null, Importance.LOW,
+                  "Class used to provide index configuration settings",
+                  group, ++order, Width.LONG, "Index configuration provider")
+          .define(INDEX_CREATION_STRATEGY_CONFIG, Type.STRING, CREATE_INDEX_AT_OPEN, Importance.LOW,
+                  "Whether to create indexes when task is started or when documents are written.\n"
+                  + "Valid values are `" + CREATE_INDEX_AT_OPEN + "` or `" + CREATE_INDEX_AT_WRITE + "`.")
+          .define(CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, Type.CLASS, null, Importance.LOW,
+                  "The class to use to perform any final transformations on documents after conversion to JSON.",
+                  group, ++order, Width.SHORT, "Custom Document Transformer Class");
     }
 
     return configDef;

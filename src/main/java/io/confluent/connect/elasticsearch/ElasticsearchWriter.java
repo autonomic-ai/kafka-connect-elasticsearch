@@ -36,6 +36,9 @@ import io.searchbox.client.JestClient;
 import io.searchbox.client.JestResult;
 import io.searchbox.indices.CreateIndex;
 import io.searchbox.indices.IndicesExists;
+import io.searchbox.indices.aliases.AddAliasMapping;
+import io.searchbox.indices.aliases.ModifyAliases;
+
 
 public class ElasticsearchWriter {
   private static final Logger log = LoggerFactory.getLogger(ElasticsearchWriter.class);
@@ -49,7 +52,8 @@ public class ElasticsearchWriter {
   private final Map<String, String> topicToIndexMap;
   private final long flushTimeoutMs;
   private final BulkProcessor<IndexableRecord, ?> bulkProcessor;
-
+  private final IndexConfigurationProvider indexConfigurationProvider;
+  private final CustomDocumentTransformer customDocumentTransformer;
   private final Set<String> existingMappings;
 
   ElasticsearchWriter(
@@ -66,7 +70,9 @@ public class ElasticsearchWriter {
       int batchSize,
       long lingerMs,
       int maxRetries,
-      long retryBackoffMs
+      long retryBackoffMs,
+      IndexConfigurationProvider indexConfigurationProvider,
+      CustomDocumentTransformer customDocumentTransformer
   ) {
     this.client = client;
     this.type = type;
@@ -76,6 +82,8 @@ public class ElasticsearchWriter {
     this.ignoreSchemaTopics = ignoreSchemaTopics;
     this.topicToIndexMap = topicToIndexMap;
     this.flushTimeoutMs = flushTimeoutMs;
+    this.indexConfigurationProvider = indexConfigurationProvider;
+    this.customDocumentTransformer = customDocumentTransformer;
 
     bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -106,9 +114,21 @@ public class ElasticsearchWriter {
     private long lingerMs;
     private int maxRetry;
     private long retryBackoffMs;
+    private IndexConfigurationProvider indexConfigurationProvider;
+    private CustomDocumentTransformer customDocumentTransformer;
 
     public Builder(JestClient client) {
       this.client = client;
+    }
+
+    public Builder setIndexConfigurationProvider(IndexConfigurationProvider indexConfigurationProvider) {
+      this.indexConfigurationProvider = indexConfigurationProvider;
+      return this;
+    }
+
+    public Builder setCustomDocumentTransformer(CustomDocumentTransformer customDocumentTransformer) {
+      this.customDocumentTransformer = customDocumentTransformer;
+      return this;
     }
 
     public Builder setType(String type) {
@@ -183,22 +203,35 @@ public class ElasticsearchWriter {
           batchSize,
           lingerMs,
           maxRetry,
-          retryBackoffMs
+          retryBackoffMs,
+          indexConfigurationProvider,
+          customDocumentTransformer
       );
     }
   }
 
   public void write(Collection<SinkRecord> records) {
+    String mappingConfiguration = null;
+    String documentRootField = null;
     for (SinkRecord sinkRecord : records) {
       final String indexOverride = topicToIndexMap.get(sinkRecord.topic());
-      final String index = indexOverride != null ? indexOverride : sinkRecord.topic();
+      final String index;
       final boolean ignoreKey = ignoreKeyTopics.contains(sinkRecord.topic()) || this.ignoreKey;
       final boolean ignoreSchema = ignoreSchemaTopics.contains(sinkRecord.topic()) || this.ignoreSchema;
 
+      if (indexConfigurationProvider != null) {
+        index = indexConfigurationProvider.getIndexName(sinkRecord);
+        mappingConfiguration = indexConfigurationProvider.getFieldMappingConfiguration(sinkRecord);
+        documentRootField = indexConfigurationProvider.getDocumentRootFieldName(sinkRecord);
+      } else if (indexOverride != null) {
+        index = indexOverride;
+      } else {
+        index = sinkRecord.topic();
+      }
       if (!ignoreSchema && !existingMappings.contains(index)) {
         try {
           if (Mapping.getMapping(client, index, type) == null) {
-            Mapping.createMapping(client, index, type, sinkRecord.valueSchema());
+            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), mappingConfiguration, documentRootField);
           }
         } catch (IOException e) {
           // FIXME: concurrent tasks could attempt to create the mapping and one of the requests may fail
@@ -207,10 +240,24 @@ public class ElasticsearchWriter {
         existingMappings.add(index);
       }
 
-      final IndexableRecord indexableRecord = DataConverter.convertRecord(sinkRecord, index, type, ignoreKey, ignoreSchema);
+      final IndexableRecord indexableRecord;
+
+      indexableRecord = DataConverter.convertRecord(sinkRecord, index, type, ignoreKey, ignoreSchema, indexConfigurationProvider, customDocumentTransformer);
 
       bulkProcessor.add(indexableRecord, flushTimeoutMs);
     }
+  }
+
+  private Map<String, String> indexAliasesForRecords(Collection<SinkRecord> records) {
+    HashMap<String, String> indexToAliasMap = new HashMap<>();
+    for (SinkRecord record : records) {
+      if (indexConfigurationProvider != null) {
+        Map.Entry<String, String> entry = indexConfigurationProvider.getIndexAliasMapping(record);
+        if (entry != null)
+          indexToAliasMap.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return indexToAliasMap;
   }
 
   public void flush() {
@@ -241,20 +288,78 @@ public class ElasticsearchWriter {
     }
   }
 
-  public void createIndicesForTopics(Set<String> assignedTopics) {
-    for (String index : indicesForTopics(assignedTopics)) {
-      if (!indexExists(index)) {
-        CreateIndex createIndex = new CreateIndex.Builder(index).build();
+  public void createIndicesForTopics(Set<String> assignedTopics) throws ConnectException {
+    this.createIndices(indicesForTopics(assignedTopics));
+  }
+
+  public void createIndicesForRecords(Collection<SinkRecord> records) throws ConnectException {
+    Set<String> indices = indicesForRecords(records);
+    this.createIndices(indices);
+    this.createIndexAliases(indexAliasesForRecords(records));
+  }
+
+  public void createIndexAliases(Map<String, String> indexAliasMap) {
+    for (Map.Entry<String, String> entry: indexAliasMap.entrySet()) {
+      if (entry.getKey() != null && entry.getValue() != null) {
+        ModifyAliases modifyAliases = new ModifyAliases.Builder(
+                new AddAliasMapping.Builder(entry.getKey(), entry.getValue())
+                        .build())
+                .build();
         try {
-          JestResult result = client.execute(createIndex);
+          JestResult result = client.execute(modifyAliases);
           if (!result.isSucceeded()) {
-            throw new ConnectException("Could not create index:" + index);
+            throw new ConnectException("Could not create alias " + entry.getValue() + " for index " + entry.getKey());
           }
         } catch (IOException e) {
           throw new ConnectException(e);
         }
       }
     }
+  }
+
+  public void createIndices(Set<String> indices) throws ConnectException {
+    String customIndexSettings = null;
+    CreateIndex createIndex = null;
+
+    if (indexConfigurationProvider != null &&
+            indexConfigurationProvider.getIndexCreationSettings() != null) {
+      customIndexSettings = indexConfigurationProvider.getIndexCreationSettings();
+    }
+
+    for (String index : indices) {
+      if (!indexExists(index)) {
+        if (customIndexSettings != null) {
+          createIndex = new CreateIndex.Builder(index).settings(customIndexSettings).build();
+        } else {
+          createIndex = new CreateIndex.Builder(index).build();
+        }
+        try {
+          JestResult result = client.execute(createIndex);
+          if (!result.isSucceeded()) {
+            log.error("Unable to create index {}: ", index, result.getErrorMessage());
+            throw new ConnectException("Could not create index: " + index + ": " + result.getErrorMessage());
+          }
+        } catch (IOException e) {
+          throw new ConnectException(e);
+        }
+      }
+    }
+  }
+
+  private Set<String> indicesForRecords(Collection<SinkRecord> records) {
+    Set<String> topics = new HashSet<>();
+
+    if (indexConfigurationProvider != null) {
+      for (SinkRecord record : records) {
+        topics.add(indexConfigurationProvider.getIndexName(record));
+      }
+    } else {
+      for (SinkRecord record : records) {
+        topics.add(record.topic());
+      }
+    }
+
+    return topics;
   }
 
   private Set<String> indicesForTopics(Set<String> assignedTopics) {

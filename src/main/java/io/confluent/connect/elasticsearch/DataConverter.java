@@ -46,6 +46,7 @@ import static io.confluent.connect.elasticsearch.ElasticsearchSinkConnectorConst
 public class DataConverter {
 
   private static final Converter JSON_CONVERTER;
+
   static {
     JSON_CONVERTER = new JsonConverter();
     JSON_CONVERTER.configure(Collections.singletonMap("schemas.enable", "false"), false);
@@ -78,9 +79,13 @@ public class DataConverter {
     }
   }
 
-  public static IndexableRecord convertRecord(SinkRecord record, String index, String type, boolean ignoreKey, boolean ignoreSchema) {
+  public static IndexableRecord convertRecord(SinkRecord record, String index, String type, boolean ignoreKey, boolean ignoreSchema, IndexConfigurationProvider indexConfigurationProvider, CustomDocumentTransformer customDocumentTransformer) {
+    IndexOperation operation = null;
     final String id;
-    if (ignoreKey) {
+    final String finalPayload;
+    if (indexConfigurationProvider != null) {
+      id = indexConfigurationProvider.getDocumentId(record);
+    } else if (ignoreKey) {
       id = record.topic() + "+" + String.valueOf((int) record.kafkaPartition()) + "+" + String.valueOf(record.kafkaOffset());
     } else {
       id = DataConverter.convertKey(record.keySchema(), record.key());
@@ -96,9 +101,19 @@ public class DataConverter {
       value = record.value();
     }
 
+    if (indexConfigurationProvider != null)
+      operation = indexConfigurationProvider.getIndexOperation(record);
+    else
+      operation = IndexOperation.index;
+
     final String payload = new String(JSON_CONVERTER.fromConnectData(record.topic(), schema, value), StandardCharsets.UTF_8);
+    if (customDocumentTransformer != null) {
+      finalPayload = customDocumentTransformer.transformDocument(payload);
+    } else {
+      finalPayload = payload;
+    }
     final Long version = ignoreKey ? null : record.kafkaOffset();
-    return new IndexableRecord(new Key(index, type, id), payload, version);
+    return new IndexableRecord(new Key(index, type, id), finalPayload, version, operation);
   }
 
   // We need to pre process the Kafka Connect schema before converting to JSON as Elasticsearch

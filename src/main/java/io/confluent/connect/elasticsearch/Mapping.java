@@ -56,13 +56,26 @@ public class Mapping {
    * @param schema The schema used to infer mapping.
    * @throws IOException
    */
-  public static void createMapping(JestClient client, String index, String type, Schema schema) throws IOException {
+  public static void createMapping(JestClient client, String index, String type, Schema schema, String fieldConfiguration, String documentRootField) throws IOException {
     ObjectNode obj = JsonNodeFactory.instance.objectNode();
-    obj.set(type, inferMapping(schema));
+    if (schema.type() == Schema.Type.STRUCT && schema.field(documentRootField) != null) {
+      obj.set(type, inferMapping(schema.field(documentRootField).schema()));
+    } else {
+      obj.set(type, inferMapping(schema));
+    }
+
     PutMapping putMapping = new PutMapping.Builder(index, type, obj.toString()).build();
     JestResult result = client.execute(putMapping);
     if (!result.isSucceeded()) {
       throw new ConnectException("Cannot create mapping " + obj + " -- " + result.getErrorMessage());
+    }
+
+    if (fieldConfiguration != null) {
+      putMapping = new PutMapping.Builder(index, type, fieldConfiguration).build();
+      result = client.execute(putMapping);
+      if (!result.isSucceeded()) {
+        throw new ConnectException("Cannot create mapping " + fieldConfiguration + " -- " + result.getErrorMessage());
+      }
     }
   }
 
