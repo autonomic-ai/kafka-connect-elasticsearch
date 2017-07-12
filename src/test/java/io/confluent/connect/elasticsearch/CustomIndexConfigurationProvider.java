@@ -53,4 +53,14 @@ public class CustomIndexConfigurationProvider implements IndexConfigurationProvi
     return "{ \"settings\" : { \"number_of_shards\" : 1, " +
         "\"number_of_replicas\" : 2} }";
   }
+
+  @Override
+  public String getFieldMappingConfiguration(SinkRecord record) {
+    return null;
+  }
+
+  @Override
+  public String getDocumentRootFieldName(SinkRecord record) {
+    return null;
+  }
 }

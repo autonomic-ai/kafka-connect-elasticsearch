@@ -79,9 +79,10 @@ public class DataConverter {
     }
   }
 
-  public static IndexableRecord convertRecord(SinkRecord record, String index, String type, boolean ignoreKey, boolean ignoreSchema, IndexConfigurationProvider indexConfigurationProvider) {
+  public static IndexableRecord convertRecord(SinkRecord record, String index, String type, boolean ignoreKey, boolean ignoreSchema, IndexConfigurationProvider indexConfigurationProvider, CustomDocumentTransformer customDocumentTransformer) {
     IndexOperation operation = null;
     final String id;
+    final String finalPayload;
     if (indexConfigurationProvider != null) {
       id = indexConfigurationProvider.getDocumentId(record);
     } else if (ignoreKey) {
@@ -106,8 +107,13 @@ public class DataConverter {
       operation = IndexOperation.index;
 
     final String payload = new String(JSON_CONVERTER.fromConnectData(record.topic(), schema, value), StandardCharsets.UTF_8);
+    if (customDocumentTransformer != null) {
+      finalPayload = customDocumentTransformer.transformDocument(payload);
+    } else {
+      finalPayload = payload;
+    }
     final Long version = ignoreKey ? null : record.kafkaOffset();
-    return new IndexableRecord(new Key(index, type, id), payload, version, operation);
+    return new IndexableRecord(new Key(index, type, id), finalPayload, version, operation);
   }
 
   // We need to pre process the Kafka Connect schema before converting to JSON as Elasticsearch

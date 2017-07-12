@@ -53,7 +53,7 @@ public class ElasticsearchWriter {
   private final long flushTimeoutMs;
   private final BulkProcessor<IndexableRecord, ?> bulkProcessor;
   private final IndexConfigurationProvider indexConfigurationProvider;
-
+  private final CustomDocumentTransformer customDocumentTransformer;
   private final Set<String> existingMappings;
 
   ElasticsearchWriter(
@@ -71,7 +71,8 @@ public class ElasticsearchWriter {
       long lingerMs,
       int maxRetries,
       long retryBackoffMs,
-      IndexConfigurationProvider indexConfigurationProvider
+      IndexConfigurationProvider indexConfigurationProvider,
+      CustomDocumentTransformer customDocumentTransformer
   ) {
     this.client = client;
     this.type = type;
@@ -82,6 +83,7 @@ public class ElasticsearchWriter {
     this.topicToIndexMap = topicToIndexMap;
     this.flushTimeoutMs = flushTimeoutMs;
     this.indexConfigurationProvider = indexConfigurationProvider;
+    this.customDocumentTransformer = customDocumentTransformer;
 
     bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -113,6 +115,7 @@ public class ElasticsearchWriter {
     private int maxRetry;
     private long retryBackoffMs;
     private IndexConfigurationProvider indexConfigurationProvider;
+    private CustomDocumentTransformer customDocumentTransformer;
 
     public Builder(JestClient client) {
       this.client = client;
@@ -120,6 +123,11 @@ public class ElasticsearchWriter {
 
     public Builder setIndexConfigurationProvider(IndexConfigurationProvider indexConfigurationProvider) {
       this.indexConfigurationProvider = indexConfigurationProvider;
+      return this;
+    }
+
+    public Builder setCustomDocumentTransformer(CustomDocumentTransformer customDocumentTransformer) {
+      this.customDocumentTransformer = customDocumentTransformer;
       return this;
     }
 
@@ -196,12 +204,15 @@ public class ElasticsearchWriter {
           lingerMs,
           maxRetry,
           retryBackoffMs,
-          indexConfigurationProvider
+          indexConfigurationProvider,
+          customDocumentTransformer
       );
     }
   }
 
   public void write(Collection<SinkRecord> records) {
+    String mappingConfiguration = null;
+    String documentRootField = null;
     for (SinkRecord sinkRecord : records) {
       final String indexOverride = topicToIndexMap.get(sinkRecord.topic());
       final String index;
@@ -210,6 +221,8 @@ public class ElasticsearchWriter {
 
       if (indexConfigurationProvider != null) {
         index = indexConfigurationProvider.getIndexName(sinkRecord);
+        mappingConfiguration = indexConfigurationProvider.getFieldMappingConfiguration(sinkRecord);
+        documentRootField = indexConfigurationProvider.getDocumentRootFieldName(sinkRecord);
       } else if (indexOverride != null) {
         index = indexOverride;
       } else {
@@ -218,7 +231,7 @@ public class ElasticsearchWriter {
       if (!ignoreSchema && !existingMappings.contains(index)) {
         try {
           if (Mapping.getMapping(client, index, type) == null) {
-            Mapping.createMapping(client, index, type, sinkRecord.valueSchema());
+            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), mappingConfiguration, documentRootField);
           }
         } catch (IOException e) {
           // FIXME: concurrent tasks could attempt to create the mapping and one of the requests may fail
@@ -229,7 +242,7 @@ public class ElasticsearchWriter {
 
       final IndexableRecord indexableRecord;
 
-      indexableRecord = DataConverter.convertRecord(sinkRecord, index, type, ignoreKey, ignoreSchema, indexConfigurationProvider);
+      indexableRecord = DataConverter.convertRecord(sinkRecord, index, type, ignoreKey, ignoreSchema, indexConfigurationProvider, customDocumentTransformer);
 
       bulkProcessor.add(indexableRecord, flushTimeoutMs);
     }

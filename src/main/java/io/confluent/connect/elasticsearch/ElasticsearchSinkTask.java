@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class ElasticsearchSinkTask extends SinkTask {
 
@@ -41,6 +42,7 @@ public class ElasticsearchSinkTask extends SinkTask {
   public static final String CREATE_INDEX_AT_WRITE = "atWrite";
 
   private static final Logger log = LoggerFactory.getLogger(ElasticsearchSinkTask.class);
+  public static final int DISABLE_MAX_IDLE_CONNECTION_TIMEOUT = -1;
   private ElasticsearchWriter writer;
   private JestClient client;
   private String indexCreationStrategy = CREATE_INDEX_AT_OPEN;
@@ -79,6 +81,8 @@ public class ElasticsearchSinkTask extends SinkTask {
       int maxRetry = config.getInt(ElasticsearchSinkConnectorConfig.MAX_RETRIES_CONFIG);
       IndexConfigurationProvider indexConfigurationProvider = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.INDEX_CONFIGURATION_PROVIDER_CONFIG, IndexConfigurationProvider.class);
       indexCreationStrategy = config.getString(ElasticsearchSinkConnectorConfig.INDEX_CREATION_STRATEGY_CONFIG);
+      CustomDocumentTransformer customDocumentTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, CustomDocumentTransformer.class);
+      int idleConnectionTimeout = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG);
 
       switch (indexCreationStrategy) {
         case CREATE_INDEX_AT_OPEN:
@@ -95,7 +99,10 @@ public class ElasticsearchSinkTask extends SinkTask {
       } else {
         List<String> address = config.getList(ElasticsearchSinkConnectorConfig.CONNECTION_URL_CONFIG);
         JestClientFactory factory = new JestClientFactory();
-        factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).multiThreaded(true).build());
+        if (idleConnectionTimeout != DISABLE_MAX_IDLE_CONNECTION_TIMEOUT)
+          factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).maxConnectionIdleTime(idleConnectionTimeout, TimeUnit.MILLISECONDS).multiThreaded(true).build());
+        else
+          factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).multiThreaded(true).build());
         this.client = factory.getObject();
       }
 
@@ -115,7 +122,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setLingerMs(lingerMs)
           .setRetryBackoffMs(retryBackoffMs)
           .setMaxRetry(maxRetry)
-          .setIndexConfigurationProvider(indexConfigurationProvider);
+          .setIndexConfigurationProvider(indexConfigurationProvider)
+          .setCustomDocumentTransformer(customDocumentTransformer);
 
       writer = builder.build();
       writer.start();

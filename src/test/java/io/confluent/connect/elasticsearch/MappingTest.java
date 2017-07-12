@@ -42,7 +42,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
     createIndex(INDEX);
     Schema schema = createSchema();
-    Mapping.createMapping(client, INDEX, TYPE, schema);
+    Mapping.createMapping(client, INDEX, TYPE, schema, null, null);
 
     JsonObject mapping = Mapping.getMapping(client, INDEX, TYPE);
     assertNotNull(mapping);

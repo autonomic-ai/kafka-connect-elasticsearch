@@ -65,4 +65,18 @@ public interface IndexConfigurationProvider {
    * A null return value implies the use of defaults.
    */
   String getIndexCreationSettings();
+
+  /**
+   * Get additional document field mapping configuration, beyond what
+   * is expressed in record schema.
+   */
+  String getFieldMappingConfiguration(SinkRecord record);
+
+  /**
+   * In an Upsert scenario, the document data is specified as a sub-field in
+   * the JSON payload
+   *
+   * @return
+   */
+  String getDocumentRootFieldName(SinkRecord record);
 }
