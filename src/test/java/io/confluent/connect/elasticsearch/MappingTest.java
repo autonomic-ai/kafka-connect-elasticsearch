@@ -42,7 +42,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
     createIndex(INDEX);
     Schema schema = createSchema();
-    Mapping.createMapping(client, INDEX, TYPE, schema, null, null);
+    Mapping.createMapping(client, INDEX, TYPE, schema, null);
 
     JsonObject mapping = Mapping.getMapping(client, INDEX, TYPE);
     assertNotNull(mapping);
@@ -127,7 +127,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
         }
         break;
       default:
-        assertEquals("\"" + ElasticsearchSinkConnectorConstants.TYPES.get(schemaType) + "\"", type.toString());
+        assertEquals("\"" + ElasticsearchSinkTask.fieldTypes.get(schemaType) + "\"", type.toString());
     }
   }
 }

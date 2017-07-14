@@ -22,6 +22,7 @@ import io.searchbox.client.config.HttpClientConfig;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
@@ -36,13 +37,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static io.confluent.connect.elasticsearch.ElasticsearchSinkConnectorConstants.DEFAULT_TYPES;
+
 public class ElasticsearchSinkTask extends SinkTask {
 
   public static final String CREATE_INDEX_AT_OPEN = "atOpen";
   public static final String CREATE_INDEX_AT_WRITE = "atWrite";
+  public static final int DISABLE_MAX_IDLE_CONNECTION_TIMEOUT = -1;
+
+  public static Map<Schema.Type, String> fieldTypes = new HashMap<>();
 
   private static final Logger log = LoggerFactory.getLogger(ElasticsearchSinkTask.class);
-  public static final int DISABLE_MAX_IDLE_CONNECTION_TIMEOUT = -1;
   private ElasticsearchWriter writer;
   private JestClient client;
   private String indexCreationStrategy = CREATE_INDEX_AT_OPEN;
@@ -67,6 +72,7 @@ public class ElasticsearchSinkTask extends SinkTask {
       boolean ignoreKey = config.getBoolean(ElasticsearchSinkConnectorConfig.KEY_IGNORE_CONFIG);
       boolean ignoreSchema = config.getBoolean(ElasticsearchSinkConnectorConfig.SCHEMA_IGNORE_CONFIG);
 
+      Map<String, String> schemaToFieldMap = parseMapConfig(config.getList(ElasticsearchSinkConnectorConfig.SCHEMA_FIELD_MAP_OVERRIDES_CONFIG));
       Map<String, String> topicToIndexMap = parseMapConfig(config.getList(ElasticsearchSinkConnectorConfig.TOPIC_INDEX_MAP_CONFIG));
       Set<String> topicIgnoreKey = new HashSet<>(config.getList(ElasticsearchSinkConnectorConfig.TOPIC_KEY_IGNORE_CONFIG));
       Set<String> topicIgnoreSchema =  new HashSet<>(config.getList(ElasticsearchSinkConnectorConfig.TOPIC_SCHEMA_IGNORE_CONFIG));
@@ -92,6 +98,22 @@ public class ElasticsearchSinkTask extends SinkTask {
         default:
           log.warn("Ignoring unsupported index creation strategy: {}. defaulting to {}", indexCreationStrategy, CREATE_INDEX_AT_OPEN);
           indexCreationStrategy = CREATE_INDEX_AT_OPEN;
+      }
+
+      // set default schema type -> ES field type map
+      for (Map.Entry<Schema.Type, String> entry : DEFAULT_TYPES.entrySet()) {
+        fieldTypes.put(entry.getKey(), entry.getValue());
+      }
+
+      // optionally use caller-provide schema type -> ES field type map overrides
+      if (schemaToFieldMap != null && schemaToFieldMap.size() > 0) {
+        for (final Map.Entry<String, String> overrideEntry : schemaToFieldMap.entrySet()) {
+          for (Map.Entry<Schema.Type, String> typeEntry : fieldTypes.entrySet()) {
+            if (typeEntry.getKey().toString().toLowerCase().equals(overrideEntry.getKey().toLowerCase())) {
+              typeEntry.setValue(overrideEntry.getValue());
+            }
+          }
+        }
       }
 
       if (client != null) {

@@ -211,7 +211,6 @@ public class ElasticsearchWriter {
   }
 
   public void write(Collection<SinkRecord> records) {
-    String mappingConfiguration = null;
     String documentRootField = null;
     for (SinkRecord sinkRecord : records) {
       final String indexOverride = topicToIndexMap.get(sinkRecord.topic());
@@ -221,7 +220,6 @@ public class ElasticsearchWriter {
 
       if (indexConfigurationProvider != null) {
         index = indexConfigurationProvider.getIndexName(sinkRecord);
-        mappingConfiguration = indexConfigurationProvider.getFieldMappingConfiguration(sinkRecord);
         documentRootField = indexConfigurationProvider.getDocumentRootFieldName(sinkRecord);
       } else if (indexOverride != null) {
         index = indexOverride;
@@ -231,7 +229,7 @@ public class ElasticsearchWriter {
       if (!ignoreSchema && !existingMappings.contains(index)) {
         try {
           if (Mapping.getMapping(client, index, type) == null) {
-            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), mappingConfiguration, documentRootField);
+            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), documentRootField);
           }
         } catch (IOException e) {
           // FIXME: concurrent tasks could attempt to create the mapping and one of the requests may fail

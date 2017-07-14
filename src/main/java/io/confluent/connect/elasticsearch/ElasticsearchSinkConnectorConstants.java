@@ -36,17 +36,17 @@ public class ElasticsearchSinkConnectorConstants {
   public static final String STRING_TYPE = "string";
   public static final String DATE_TYPE = "date";
 
-  public static final Map<Type, String> TYPES = new HashMap<>();
+  public static final Map<Type, String> DEFAULT_TYPES = new HashMap<>();
 
   static {
-    TYPES.put(Type.BOOLEAN, BOOLEAN_TYPE);
-    TYPES.put(Type.INT8, BYTE_TYPE);
-    TYPES.put(Type.INT16, SHORT_TYPE);
-    TYPES.put(Type.INT32, INTEGER_TYPE);
-    TYPES.put(Type.INT64, LONG_TYPE);
-    TYPES.put(Type.FLOAT32, FLOAT_TYPE);
-    TYPES.put(Type.FLOAT64, DOUBLE_TYPE);
-    TYPES.put(Type.STRING, STRING_TYPE);
-    TYPES.put(Type.BYTES, BINARY_TYPE);
+    DEFAULT_TYPES.put(Type.BOOLEAN, BOOLEAN_TYPE);
+    DEFAULT_TYPES.put(Type.INT8, BYTE_TYPE);
+    DEFAULT_TYPES.put(Type.INT16, SHORT_TYPE);
+    DEFAULT_TYPES.put(Type.INT32, INTEGER_TYPE);
+    DEFAULT_TYPES.put(Type.INT64, LONG_TYPE);
+    DEFAULT_TYPES.put(Type.FLOAT32, FLOAT_TYPE);
+    DEFAULT_TYPES.put(Type.FLOAT64, DOUBLE_TYPE);
+    DEFAULT_TYPES.put(Type.STRING, STRING_TYPE);
+    DEFAULT_TYPES.put(Type.BYTES, BINARY_TYPE);
   }
 }

@@ -55,11 +55,6 @@ public class CustomIndexConfigurationProvider implements IndexConfigurationProvi
   }
 
   @Override
-  public String getFieldMappingConfiguration(SinkRecord record) {
-    return null;
-  }
-
-  @Override
   public String getDocumentRootFieldName(SinkRecord record) {
     return null;
   }

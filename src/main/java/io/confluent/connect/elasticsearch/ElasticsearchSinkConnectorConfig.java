@@ -49,6 +49,7 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
   public static final String INDEX_CREATION_STRATEGY_CONFIG = "index.creation.strategy";
   public static final String CUSTOM_DOCUMENT_TRANSFORMER_CONFIG = "custom.document.transformer";
   public static final String MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG = "max.idle.connection.timeout.ms";
+  public static final String SCHEMA_FIELD_MAP_OVERRIDES_CONFIG = "schema.field.map.overrides";
 
 
   protected static ConfigDef baseConfigDef() {
@@ -98,7 +99,10 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
           .define(MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG, Type.INT, DISABLE_MAX_IDLE_CONNECTION_TIMEOUT, Importance.LOW,
                   "Limit the duration a connection to Elasticsearch may remain idle before being closed by the client. "
                   + "(disabled by default)",
-                  group, ++order, Width.LONG, "Idle Connection timeout");
+                  group, ++order, Width.LONG, "Idle Connection timeout")
+          .define(SCHEMA_FIELD_MAP_OVERRIDES_CONFIG, Type.LIST, "", Importance.LOW,
+                  "A Map which overrides default Kafka Schema field to index mapping field.",
+                  group, ++order, Width.LONG, "Override Kafka Schema field to index map field");
     }
 
     {

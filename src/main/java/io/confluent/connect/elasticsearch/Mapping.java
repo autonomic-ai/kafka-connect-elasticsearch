@@ -56,7 +56,7 @@ public class Mapping {
    * @param schema The schema used to infer mapping.
    * @throws IOException
    */
-  public static void createMapping(JestClient client, String index, String type, Schema schema, String fieldConfiguration, String documentRootField) throws IOException {
+  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField) throws IOException {
     ObjectNode obj = JsonNodeFactory.instance.objectNode();
     if (schema.type() == Schema.Type.STRUCT && schema.field(documentRootField) != null) {
       obj.set(type, inferMapping(schema.field(documentRootField).schema()));
@@ -68,14 +68,6 @@ public class Mapping {
     JestResult result = client.execute(putMapping);
     if (!result.isSucceeded()) {
       throw new ConnectException("Cannot create mapping " + obj + " -- " + result.getErrorMessage());
-    }
-
-    if (fieldConfiguration != null) {
-      putMapping = new PutMapping.Builder(index, type, fieldConfiguration).build();
-      result = client.execute(putMapping);
-      if (!result.isSucceeded()) {
-        throw new ConnectException("Cannot create mapping " + fieldConfiguration + " -- " + result.getErrorMessage());
-      }
     }
   }
 
@@ -143,7 +135,7 @@ public class Mapping {
         }
         return properties;
       default:
-        return inferPrimitive(ElasticsearchSinkConnectorConstants.TYPES.get(schemaType), defaultValue);
+        return inferPrimitive(ElasticsearchSinkTask.fieldTypes.get(schemaType), defaultValue);
     }
   }
 

@@ -67,12 +67,6 @@ public interface IndexConfigurationProvider {
   String getIndexCreationSettings();
 
   /**
-   * Get additional document field mapping configuration, beyond what
-   * is expressed in record schema.
-   */
-  String getFieldMappingConfiguration(SinkRecord record);
-
-  /**
    * In an Upsert scenario, the document data is specified as a sub-field in
    * the JSON payload
    *

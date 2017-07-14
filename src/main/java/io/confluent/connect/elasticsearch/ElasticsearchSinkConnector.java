@@ -29,6 +29,7 @@ import java.util.Map;
 
 public class ElasticsearchSinkConnector extends SinkConnector {
 
+
   private Map<String, String> configProperties;
 
   @Override
@@ -39,6 +40,8 @@ public class ElasticsearchSinkConnector extends SinkConnector {
   @Override
   public void start(Map<String, String> props) throws ConnectException {
     try {
+
+
       configProperties = props;
       ElasticsearchSinkConnectorConfig config = new ElasticsearchSinkConnectorConfig(props);
     } catch (ConfigException e) {
