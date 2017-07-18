@@ -55,6 +55,10 @@ public class ElasticsearchWriter {
   private final IndexConfigurationProvider indexConfigurationProvider;
   private final CustomDocumentTransformer customDocumentTransformer;
   private final Set<String> existingMappings;
+  private final static int QUEUE_REPORT_INTERVAL = 30;
+  private final static int MILLIS_PER_SECOND = 1000;
+  private HashMap<String, Integer> currentIndexTotals = new HashMap<>();
+  private long lastReport = 0;
 
   ElasticsearchWriter(
       JestClient client,
@@ -243,6 +247,20 @@ public class ElasticsearchWriter {
       indexableRecord = DataConverter.convertRecord(sinkRecord, index, type, ignoreKey, ignoreSchema, indexConfigurationProvider, customDocumentTransformer);
 
       bulkProcessor.add(indexableRecord, flushTimeoutMs);
+
+      int count = currentIndexTotals.containsKey(index) ? currentIndexTotals.get(index) : 0;
+      currentIndexTotals.put(index, count + 1);
+    }
+
+    if (System.currentTimeMillis() > lastReport + (QUEUE_REPORT_INTERVAL * MILLIS_PER_SECOND) &&
+            currentIndexTotals.size() > 0) {
+      log.info("Documents enqueued in last {}s: ", QUEUE_REPORT_INTERVAL);
+      for (Map.Entry<String, Integer> entry : currentIndexTotals.entrySet()) {
+        log.info("{}: {}", entry.getKey(), entry.getValue());
+      }
+
+      lastReport = System.currentTimeMillis();
+      currentIndexTotals.clear();
     }
   }
 

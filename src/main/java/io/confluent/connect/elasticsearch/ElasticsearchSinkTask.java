@@ -179,7 +179,7 @@ public class ElasticsearchSinkTask extends SinkTask {
   public void flush(Map<TopicPartition, OffsetAndMetadata> offsets) {
     log.debug("Flushing data to Elasticsearch with the following offsets: {}", offsets);
     writer.flush();
-    log.debug("Flush returned sucessfully.");
+    log.debug("Flush returned successfully.");
   }
 
   @Override
