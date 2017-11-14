@@ -44,6 +44,8 @@ import io.searchbox.indices.mapping.PutMapping;
 import static io.confluent.connect.elasticsearch.ElasticsearchSinkConnectorConstants.MAP_KEY;
 import static io.confluent.connect.elasticsearch.ElasticsearchSinkConnectorConstants.MAP_VALUE;
 
+import java.util.Map;
+
 public class Mapping {
 
   private static final Logger log = LoggerFactory.getLogger(Mapping.class);
@@ -56,12 +58,19 @@ public class Mapping {
    * @param schema The schema used to infer mapping.
    * @throws IOException
    */
-  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField) throws IOException {
+  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField, CustomIndexTransformer customIndexTransformer) throws IOException {
     ObjectNode obj = JsonNodeFactory.instance.objectNode();
+
+    Map<String, String> customMappings = null;
+
+    if (customIndexTransformer != null) {
+      customMappings = customIndexTransformer.getTransformTypes();
+    }
+
     if (schema.type() == Schema.Type.STRUCT && schema.field(documentRootField) != null) {
-      obj.set(type, inferMapping(schema.field(documentRootField).schema()));
+      obj.set(type, inferMapping(schema.field(documentRootField).schema(), customMappings));
     } else {
-      obj.set(type, inferMapping(schema));
+      obj.set(type, inferMapping(schema, customMappings));
     }
 
     PutMapping putMapping = new PutMapping.Builder(index, type, obj.toString()).build();
@@ -91,7 +100,7 @@ public class Mapping {
    * Infer mapping from the provided schema.
    * @param schema The schema used to infer mapping.
    */
-  public static JsonNode inferMapping(Schema schema) {
+  public static JsonNode inferMapping(Schema schema, Map<String, String> fieldMapping) {
     if (schema == null) {
       throw new DataException("Cannot infer mapping without schema.");
     }
@@ -118,20 +127,28 @@ public class Mapping {
     switch (schemaType) {
       case ARRAY:
         valueSchema = schema.valueSchema();
-        return inferMapping(valueSchema);
+        return inferMapping(valueSchema, fieldMapping);
       case MAP:
         keySchema = schema.keySchema();
         valueSchema = schema.valueSchema();
         properties.set("properties", fields);
-        fields.set(MAP_KEY, inferMapping(keySchema));
-        fields.set(MAP_VALUE, inferMapping(valueSchema));
+        fields.set(MAP_KEY, inferMapping(keySchema, fieldMapping));
+        fields.set(MAP_VALUE, inferMapping(valueSchema, fieldMapping));
         return properties;
       case STRUCT:
         properties.set("properties", fields);
         for (Field field : schema.fields()) {
           String fieldName = field.name();
           Schema fieldSchema = field.schema();
-          fields.set(fieldName, inferMapping(fieldSchema));
+
+          if (fieldMapping != null && fieldMapping.containsKey(fieldName)) {
+            ObjectNode customTypeNode = JsonNodeFactory.instance.objectNode();
+            customTypeNode.set("type",
+                  JsonNodeFactory.instance.textNode(fieldMapping.get(fieldName)));
+            fields.set(fieldName, customTypeNode);
+          } else {
+            fields.set(fieldName, inferMapping(fieldSchema, fieldMapping));
+          }
         }
         return properties;
       default:
