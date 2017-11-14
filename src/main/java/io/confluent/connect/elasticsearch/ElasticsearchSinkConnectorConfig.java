@@ -48,6 +48,7 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
   public static final String INDEX_CONFIGURATION_PROVIDER_CONFIG = "index.configuration.provider";
   public static final String INDEX_CREATION_STRATEGY_CONFIG = "index.creation.strategy";
   public static final String CUSTOM_DOCUMENT_TRANSFORMER_CONFIG = "custom.document.transformer";
+  public static final String CUSTOM_INDEX_TRANSFORMER_CONFIG = "custom.index.transformer";
   public static final String MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG = "max.idle.connection.timeout.ms";
   public static final String SCHEMA_FIELD_MAP_OVERRIDES_CONFIG = "schema.field.map.overrides";
 
@@ -140,7 +141,10 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
                   + "Valid values are `" + CREATE_INDEX_AT_OPEN + "` or `" + CREATE_INDEX_AT_WRITE + "`.")
           .define(CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, Type.CLASS, null, Importance.LOW,
                   "The class to use to perform any final transformations on documents after conversion to JSON.",
-                  group, ++order, Width.SHORT, "Custom Document Transformer Class");
+                  group, ++order, Width.SHORT, "Custom Document Transformer Class")
+          .define(CUSTOM_INDEX_TRANSFORMER_CONFIG, Type.CLASS, null, Importance.LOW,
+                  "The class to use to perform any final transformations on document indexes.",
+                  group, ++order, Width.SHORT, "Custom Index Transformer Class");
     }
 
     return configDef;

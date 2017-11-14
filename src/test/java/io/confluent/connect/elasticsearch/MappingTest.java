@@ -16,8 +16,13 @@
 
 package io.confluent.connect.elasticsearch;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.gson.JsonObject;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -27,6 +32,7 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.test.InternalTestCluster;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class MappingTest extends ElasticsearchSinkTestBase {
@@ -42,11 +48,79 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
     createIndex(INDEX);
     Schema schema = createSchema();
-    Mapping.createMapping(client, INDEX, TYPE, schema, null);
+    Mapping.createMapping(client, INDEX, TYPE, schema, null, null);
 
     JsonObject mapping = Mapping.getMapping(client, INDEX, TYPE);
     assertNotNull(mapping);
     verifyMapping(schema, mapping);
+  }
+
+  @Test
+  public void testCustomMapping() throws Exception {
+
+    InternalTestCluster cluster = ESIntegTestCase.internalCluster();
+    cluster.ensureAtLeastNumDataNodes(1);
+
+    ElasticsearchSinkTask.reload(Arrays.asList("string:keyword"));
+    createIndex(INDEX);
+    Schema schema = createSchema();
+
+    HashMap<String, String> typeMapping = new HashMap<String, String>(){{ put("boolean","my_type"); }};
+
+    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+
+    Assert.assertTrue(document.toString().contains("keyword"));
+    Assert.assertTrue(document.toString().contains("my_type"));
+
+    //Reset Primitive types
+    ElasticsearchSinkTask.loadPrimitiveTypes();
+  }
+
+  @Test
+  public void testCustomMappingNotMatching() throws Exception {
+
+    InternalTestCluster cluster = ESIntegTestCase.internalCluster();
+    cluster.ensureAtLeastNumDataNodes(1);
+
+    ElasticsearchSinkTask.reload(Arrays.asList("invalid:keyword"));
+    createIndex(INDEX);
+    Schema schema = createSchema();
+
+    HashMap<String, String> typeMapping = new HashMap<String, String>(){{ put("location","my_invalid_type"); }};
+
+    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+
+    Assert.assertTrue(!document.toString().contains("keyword"));
+    Assert.assertTrue(!document.toString().contains("my_invalid_type"));
+
+    //Reset Primitive types
+    ElasticsearchSinkTask.loadPrimitiveTypes();
+  }
+
+  @Test
+  public void testCustomMappingMultipleReplacements() throws Exception {
+
+    InternalTestCluster cluster = ESIntegTestCase.internalCluster();
+    cluster.ensureAtLeastNumDataNodes(1);
+
+    ElasticsearchSinkTask.reload(Arrays.asList("string:keyword", "int8:my_int"));
+    createIndex(INDEX);
+    Schema schema = createSchema();
+
+    HashMap<String, String> typeMapping = new HashMap<String, String>()
+      {{ put("boolean","my_boolean");
+         put("decimal", "my_decimal");
+      }};
+
+    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+
+    Assert.assertTrue(document.toString().contains("keyword"));
+    Assert.assertTrue(document.toString().contains("my_int"));
+    Assert.assertTrue(document.toString().contains("my_boolean"));
+    Assert.assertTrue(document.toString().contains("my_decimal"));
+
+    //Reset Primitive types
+    ElasticsearchSinkTask.loadPrimitiveTypes();
   }
 
   protected Schema createSchema() {

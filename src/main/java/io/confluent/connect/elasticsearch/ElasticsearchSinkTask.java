@@ -72,7 +72,7 @@ public class ElasticsearchSinkTask extends SinkTask {
       boolean ignoreKey = config.getBoolean(ElasticsearchSinkConnectorConfig.KEY_IGNORE_CONFIG);
       boolean ignoreSchema = config.getBoolean(ElasticsearchSinkConnectorConfig.SCHEMA_IGNORE_CONFIG);
 
-      Map<String, String> schemaToFieldMap = parseMapConfig(config.getList(ElasticsearchSinkConnectorConfig.SCHEMA_FIELD_MAP_OVERRIDES_CONFIG));
+      Map<String, String> schemaToFieldMap = parseMapConfigKeyToUpper(config.getList(ElasticsearchSinkConnectorConfig.SCHEMA_FIELD_MAP_OVERRIDES_CONFIG));
       Map<String, String> topicToIndexMap = parseMapConfig(config.getList(ElasticsearchSinkConnectorConfig.TOPIC_INDEX_MAP_CONFIG));
       Set<String> topicIgnoreKey = new HashSet<>(config.getList(ElasticsearchSinkConnectorConfig.TOPIC_KEY_IGNORE_CONFIG));
       Set<String> topicIgnoreSchema =  new HashSet<>(config.getList(ElasticsearchSinkConnectorConfig.TOPIC_SCHEMA_IGNORE_CONFIG));
@@ -88,6 +88,7 @@ public class ElasticsearchSinkTask extends SinkTask {
       IndexConfigurationProvider indexConfigurationProvider = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.INDEX_CONFIGURATION_PROVIDER_CONFIG, IndexConfigurationProvider.class);
       indexCreationStrategy = config.getString(ElasticsearchSinkConnectorConfig.INDEX_CREATION_STRATEGY_CONFIG);
       CustomDocumentTransformer customDocumentTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, CustomDocumentTransformer.class);
+      CustomIndexTransformer customIndexTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_INDEX_TRANSFORMER_CONFIG, CustomIndexTransformer.class);
       int idleConnectionTimeout = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG);
 
       switch (indexCreationStrategy) {
@@ -100,21 +101,9 @@ public class ElasticsearchSinkTask extends SinkTask {
           indexCreationStrategy = CREATE_INDEX_AT_OPEN;
       }
 
-      // set default schema type -> ES field type map
-      for (Map.Entry<Schema.Type, String> entry : DEFAULT_TYPES.entrySet()) {
-        fieldTypes.put(entry.getKey(), entry.getValue());
-      }
+      loadPrimitiveTypes();
 
-      // optionally use caller-provide schema type -> ES field type map overrides
-      if (schemaToFieldMap != null && schemaToFieldMap.size() > 0) {
-        for (final Map.Entry<String, String> overrideEntry : schemaToFieldMap.entrySet()) {
-          for (Map.Entry<Schema.Type, String> typeEntry : fieldTypes.entrySet()) {
-            if (typeEntry.getKey().toString().toLowerCase().equals(overrideEntry.getKey().toLowerCase())) {
-              typeEntry.setValue(overrideEntry.getValue());
-            }
-          }
-        }
-      }
+      loadCustomMappingTypes(schemaToFieldMap);
 
       if (client != null) {
         this.client = client;
@@ -145,7 +134,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setRetryBackoffMs(retryBackoffMs)
           .setMaxRetry(maxRetry)
           .setIndexConfigurationProvider(indexConfigurationProvider)
-          .setCustomDocumentTransformer(customDocumentTransformer);
+          .setCustomDocumentTransformer(customDocumentTransformer)
+          .setCustomIndexTransformer(customIndexTransformer);
 
       writer = builder.build();
       writer.start();
@@ -154,6 +144,36 @@ public class ElasticsearchSinkTask extends SinkTask {
     }
   }
 
+  private static void loadCustomMappingTypes(Map<String, String> overrideEntries) {
+
+    if (overrideEntries != null && overrideEntries.size() > 0) {
+      for (Map.Entry<Schema.Type, String> typeEntry : fieldTypes.entrySet()) {
+        if (overrideEntries.containsKey(typeEntry.getKey().toString().toUpperCase())) {
+          typeEntry.setValue(overrideEntries.get(typeEntry.getKey().toString().toUpperCase()));
+        }
+      }
+    }
+
+  }
+
+  // public for testing
+  public static void loadPrimitiveTypes() {
+
+    fieldTypes.clear();
+
+    // set default schema type -> ES field type map
+    for (Map.Entry<Schema.Type, String> entry : DEFAULT_TYPES.entrySet()) {
+      fieldTypes.put(entry.getKey(), entry.getValue());
+    }
+  }
+
+  // public for testing
+  public static void reload(List<String> values) {
+
+    loadPrimitiveTypes();
+
+    loadCustomMappingTypes(parseMapConfigKeyToUpper(values));
+  }
 
   @Override
   public void open(Collection<TopicPartition> partitions) {
@@ -215,6 +235,17 @@ public class ElasticsearchSinkTask extends SinkTask {
       String topic = parts[0];
       String type = parts[1];
       map.put(topic, type);
+    }
+    return map;
+  }
+
+  private static Map<String, String> parseMapConfigKeyToUpper(List<String> values) {
+    Map<String, String> map = new HashMap<>();
+    for (String value: values) {
+      String[] parts = value.split(":");
+      String topic = parts[0];
+      String type = parts[1];
+      map.put(topic.toUpperCase(), type);
     }
     return map;
   }
