@@ -58,13 +58,13 @@ public class Mapping {
    * @param schema The schema used to infer mapping.
    * @throws IOException
    */
-  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField, CustomIndexTransformer customIndexTransformer) throws IOException {
+  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField, IndexConfigurationProvider indexConfigurationProvider) throws IOException {
     ObjectNode obj = JsonNodeFactory.instance.objectNode();
 
     Map<String, String> customMappings = null;
 
-    if (customIndexTransformer != null) {
-      customMappings = customIndexTransformer.getTransformTypes();
+    if (indexConfigurationProvider != null) {
+      customMappings = indexConfigurationProvider.getTypeMapping();
     }
 
     if (schema.type() == Schema.Type.STRUCT && schema.field(documentRootField) != null) {

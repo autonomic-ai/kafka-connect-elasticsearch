@@ -73,4 +73,10 @@ public interface IndexConfigurationProvider {
    * @return
    */
   String getDocumentRootFieldName(SinkRecord record);
+
+  /**
+   * Perform any final customizations on the document's index.
+   * @return Map<String,String> Collection of field names to replace.
+   */
+  public Map<String, String> getTypeMapping();
 }
