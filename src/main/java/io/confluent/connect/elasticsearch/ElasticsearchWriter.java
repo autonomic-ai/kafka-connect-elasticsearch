@@ -54,7 +54,6 @@ public class ElasticsearchWriter {
   private final BulkProcessor<IndexableRecord, ?> bulkProcessor;
   private final IndexConfigurationProvider indexConfigurationProvider;
   private final CustomDocumentTransformer customDocumentTransformer;
-  private final CustomIndexTransformer customIndexTransformer;
   private final Set<String> existingMappings;
   private final static int QUEUE_REPORT_INTERVAL = 30;
   private final static int MILLIS_PER_SECOND = 1000;
@@ -77,8 +76,7 @@ public class ElasticsearchWriter {
       int maxRetries,
       long retryBackoffMs,
       IndexConfigurationProvider indexConfigurationProvider,
-      CustomDocumentTransformer customDocumentTransformer,
-      CustomIndexTransformer customIndexTransformer
+      CustomDocumentTransformer customDocumentTransformer
   ) {
     this.client = client;
     this.type = type;
@@ -90,7 +88,6 @@ public class ElasticsearchWriter {
     this.flushTimeoutMs = flushTimeoutMs;
     this.indexConfigurationProvider = indexConfigurationProvider;
     this.customDocumentTransformer = customDocumentTransformer;
-    this.customIndexTransformer = customIndexTransformer;
 
     bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -123,7 +120,6 @@ public class ElasticsearchWriter {
     private long retryBackoffMs;
     private IndexConfigurationProvider indexConfigurationProvider;
     private CustomDocumentTransformer customDocumentTransformer;
-    private CustomIndexTransformer customIndexTransformer;
 
     public Builder(JestClient client) {
       this.client = client;
@@ -136,11 +132,6 @@ public class ElasticsearchWriter {
 
     public Builder setCustomDocumentTransformer(CustomDocumentTransformer customDocumentTransformer) {
       this.customDocumentTransformer = customDocumentTransformer;
-      return this;
-    }
-
-    public Builder setCustomIndexTransformer(CustomIndexTransformer customIndexTransformer) {
-      this.customIndexTransformer = customIndexTransformer;
       return this;
     }
 
@@ -218,8 +209,7 @@ public class ElasticsearchWriter {
           maxRetry,
           retryBackoffMs,
           indexConfigurationProvider,
-          customDocumentTransformer,
-          customIndexTransformer
+          customDocumentTransformer
       );
     }
   }
@@ -243,7 +233,7 @@ public class ElasticsearchWriter {
       if (!ignoreSchema && !existingMappings.contains(index)) {
         try {
           if (Mapping.getMapping(client, index, type) == null) {
-            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), documentRootField, customIndexTransformer);
+            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), documentRootField, indexConfigurationProvider);
           }
         } catch (IOException e) {
           // FIXME: concurrent tasks could attempt to create the mapping and one of the requests may fail

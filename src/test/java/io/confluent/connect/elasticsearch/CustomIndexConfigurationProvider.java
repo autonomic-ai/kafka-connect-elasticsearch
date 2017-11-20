@@ -58,4 +58,9 @@ public class CustomIndexConfigurationProvider implements IndexConfigurationProvi
   public String getDocumentRootFieldName(SinkRecord record) {
     return null;
   }
+
+  @Override
+  public Map<String, String> getTypeMapping() {
+    return null;
+  }
 }

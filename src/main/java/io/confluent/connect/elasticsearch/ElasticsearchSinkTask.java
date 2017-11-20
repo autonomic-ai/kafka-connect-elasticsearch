@@ -88,7 +88,6 @@ public class ElasticsearchSinkTask extends SinkTask {
       IndexConfigurationProvider indexConfigurationProvider = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.INDEX_CONFIGURATION_PROVIDER_CONFIG, IndexConfigurationProvider.class);
       indexCreationStrategy = config.getString(ElasticsearchSinkConnectorConfig.INDEX_CREATION_STRATEGY_CONFIG);
       CustomDocumentTransformer customDocumentTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, CustomDocumentTransformer.class);
-      CustomIndexTransformer customIndexTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_INDEX_TRANSFORMER_CONFIG, CustomIndexTransformer.class);
       int idleConnectionTimeout = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG);
 
       switch (indexCreationStrategy) {
@@ -134,8 +133,7 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setRetryBackoffMs(retryBackoffMs)
           .setMaxRetry(maxRetry)
           .setIndexConfigurationProvider(indexConfigurationProvider)
-          .setCustomDocumentTransformer(customDocumentTransformer)
-          .setCustomIndexTransformer(customIndexTransformer);
+          .setCustomDocumentTransformer(customDocumentTransformer);
 
       writer = builder.build();
       writer.start();
