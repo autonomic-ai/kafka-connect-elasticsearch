@@ -155,7 +155,7 @@ public class ElasticsearchSinkTask extends SinkTask {
   }
 
   // public for testing
-  public static void loadPrimitiveTypes() {
+  private static void loadPrimitiveTypes() {
 
     fieldTypes.clear();
 
@@ -165,12 +165,13 @@ public class ElasticsearchSinkTask extends SinkTask {
     }
   }
 
-  // public for testing
   public static void reload(List<String> values) {
 
     loadPrimitiveTypes();
 
-    loadCustomMappingTypes(parseMapConfigKeyToUpper(values));
+    if (values !=  null) {
+      loadCustomMappingTypes(parseMapConfigKeyToUpper(values));
+    }
   }
 
   @Override
