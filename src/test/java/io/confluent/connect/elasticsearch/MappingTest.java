@@ -60,7 +60,6 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
     InternalTestCluster cluster = ESIntegTestCase.internalCluster();
     cluster.ensureAtLeastNumDataNodes(1);
-
     ElasticsearchSinkTask.reload(Arrays.asList("string:keyword"));
     createIndex(INDEX);
     Schema schema = createSchema();
@@ -72,8 +71,8 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Assert.assertTrue(document.toString().contains("keyword"));
     Assert.assertTrue(document.toString().contains("my_type"));
 
-    //Reset Primitive types
-    ElasticsearchSinkTask.loadPrimitiveTypes();
+    //Only reset Primitive types
+    ElasticsearchSinkTask.reload(null);
   }
 
   @Test
@@ -93,8 +92,8 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Assert.assertTrue(!document.toString().contains("keyword"));
     Assert.assertTrue(!document.toString().contains("my_invalid_type"));
 
-    //Reset Primitive types
-    ElasticsearchSinkTask.loadPrimitiveTypes();
+    //Only reset Primitive types
+    ElasticsearchSinkTask.reload(null);
   }
 
   @Test
@@ -119,8 +118,8 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Assert.assertTrue(document.toString().contains("my_boolean"));
     Assert.assertTrue(document.toString().contains("my_decimal"));
 
-    //Reset Primitive types
-    ElasticsearchSinkTask.loadPrimitiveTypes();
+    //Only reset Primitive types
+    ElasticsearchSinkTask.reload(null);
   }
 
   protected Schema createSchema() {
