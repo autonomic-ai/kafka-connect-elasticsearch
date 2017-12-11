@@ -88,7 +88,11 @@ public class ElasticsearchSinkTask extends SinkTask {
       IndexConfigurationProvider indexConfigurationProvider = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.INDEX_CONFIGURATION_PROVIDER_CONFIG, IndexConfigurationProvider.class);
       indexCreationStrategy = config.getString(ElasticsearchSinkConnectorConfig.INDEX_CREATION_STRATEGY_CONFIG);
       CustomDocumentTransformer customDocumentTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, CustomDocumentTransformer.class);
+      Metrics metrics = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_METRICS_CONFIG, Metrics.class);
       int idleConnectionTimeout = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG);
+
+      if (metrics == null)
+        metrics = new Metrics();
 
       switch (indexCreationStrategy) {
         case CREATE_INDEX_AT_OPEN:
@@ -132,7 +136,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setMaxRetry(maxRetry)
           .setIndexConfigurationProvider(indexConfigurationProvider)
           .setCustomDocumentTransformer(customDocumentTransformer)
-          .setFieldTypes(fieldTypes);
+          .setFieldTypes(fieldTypes)
+          .setMetrics(metrics);
 
       writer = builder.build();
       writer.start();
@@ -162,7 +167,6 @@ public class ElasticsearchSinkTask extends SinkTask {
   }
 
   private static void loadPrimitiveTypes(Map<Schema.Type, String> dataTypes) {
-
     assert  (dataTypes != null);
 
     // set default schema type -> ES field type map
@@ -180,7 +184,6 @@ public class ElasticsearchSinkTask extends SinkTask {
         }
       }
     }
-
   }
 
   @Override

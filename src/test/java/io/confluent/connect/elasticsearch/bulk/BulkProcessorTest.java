@@ -15,6 +15,7 @@
  **/
 package io.confluent.connect.elasticsearch.bulk;
 
+import io.confluent.connect.elasticsearch.Metrics;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.junit.After;
@@ -102,6 +103,7 @@ public class BulkProcessorTest {
     final int lingerMs = 5;
     final int maxRetries = 0;
     final int retryBackoffMs = 0;
+    final Metrics metrics = new Metrics();
 
     final BulkProcessor<Integer, ?> bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -111,7 +113,8 @@ public class BulkProcessorTest {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     final int addTimeoutMs = 10;
@@ -144,6 +147,7 @@ public class BulkProcessorTest {
     final int lingerMs = 100000; // super high on purpose to make sure flush is what's causing the request
     final int maxRetries = 0;
     final int retryBackoffMs = 0;
+    final Metrics metrics = new Metrics();
 
     final BulkProcessor<Integer, ?> bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -153,7 +157,8 @@ public class BulkProcessorTest {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     client.expect(Arrays.asList(1, 2, 3), BulkResponse.success());
@@ -179,6 +184,7 @@ public class BulkProcessorTest {
     final int lingerMs = 10;
     final int maxRetries = 0;
     final int retryBackoffMs = 0;
+    final Metrics metrics = new Metrics();
 
     final BulkProcessor<Integer, ?> bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -188,7 +194,8 @@ public class BulkProcessorTest {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     final int addTimeoutMs = 10;
@@ -210,6 +217,7 @@ public class BulkProcessorTest {
     final int lingerMs = 5;
     final int maxRetries = 3;
     final int retryBackoffMs = 1;
+    final Metrics metrics = new Metrics();
 
     client.expect(Arrays.asList(42, 43), BulkResponse.failure(true, "a retiable error"));
     client.expect(Arrays.asList(42, 43), BulkResponse.failure(true, "a retriable error again"));
@@ -223,7 +231,8 @@ public class BulkProcessorTest {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     final int addTimeoutMs = 10;
@@ -241,6 +250,7 @@ public class BulkProcessorTest {
     final int lingerMs = 5;
     final int maxRetries = 3;
     final int retryBackoffMs = 1;
+    final Metrics metrics = new Metrics();
 
     final String errorInfo = "an unretriable error";
     client.expect(Arrays.asList(42, 43), BulkResponse.failure(false, errorInfo));
@@ -253,7 +263,8 @@ public class BulkProcessorTest {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     final int addTimeoutMs = 10;

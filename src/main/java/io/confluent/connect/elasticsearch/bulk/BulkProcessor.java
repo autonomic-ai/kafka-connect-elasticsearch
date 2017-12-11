@@ -15,6 +15,9 @@
  **/
 package io.confluent.connect.elasticsearch.bulk;
 
+import io.confluent.connect.elasticsearch.Metrics;
+import java.time.Clock;
+import java.time.Instant;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
@@ -51,6 +54,8 @@ public class BulkProcessor<R, B> {
   private final long lingerMs;
   private final int maxRetries;
   private final long retryBackoffMs;
+  private final Metrics metrics;
+  private final Clock clock;
 
   private final Thread farmer;
   private final ExecutorService executor;
@@ -73,7 +78,8 @@ public class BulkProcessor<R, B> {
       int batchSize,
       long lingerMs,
       int maxRetries,
-      long retryBackoffMs
+      long retryBackoffMs,
+      Metrics metrics
   ) {
     this.time = time;
     this.bulkClient = bulkClient;
@@ -82,6 +88,9 @@ public class BulkProcessor<R, B> {
     this.lingerMs = lingerMs;
     this.maxRetries = maxRetries;
     this.retryBackoffMs = retryBackoffMs;
+    this.metrics = metrics;
+
+    this.clock = Clock.systemUTC();
 
     unsentRecords = new ArrayDeque<>(maxBufferedRecords);
 
@@ -259,6 +268,8 @@ public class BulkProcessor<R, B> {
   public synchronized void add(R record, long timeoutMs) {
     throwIfTerminal();
 
+    Object timer = metrics.startIndexingBlockTimer();
+
     if (bufferedRecords() >= maxBufferedRecords) {
       final long addStartTimeMs = time.milliseconds();
       for (long elapsedMs = time.milliseconds() - addStartTimeMs;
@@ -267,15 +278,19 @@ public class BulkProcessor<R, B> {
         try {
           wait(timeoutMs - elapsedMs);
         } catch (InterruptedException e) {
+          metrics.observeIndexingBlockTime(timer);
           throw new ConnectException(e);
         }
       }
       throwIfTerminal();
       if (bufferedRecords() >= maxBufferedRecords) {
+        metrics.observeIndexingBlockTime(timer);
         throw new ConnectException("Add timeout expired before buffer availability");
       }
     }
 
+    metrics.observeIndexingBlockTime(timer);
+    metrics.setIndexBufferUsed(unsentRecords.size());
     unsentRecords.addLast(record);
     notifyAll();
   }
@@ -335,9 +350,12 @@ public class BulkProcessor<R, B> {
 
     private BulkResponse execute() throws Exception {
       final B bulkReq;
+      Instant startInstant = clock.instant();
+
       try {
         bulkReq = bulkClient.bulkRequest(batch);
       } catch (Exception e) {
+        insertLatency(startInstant);
         log.error("Failed to create bulk request from batch {} of {} records", batchId, batch.size(), e);
         throw e;
       }
@@ -347,6 +365,10 @@ public class BulkProcessor<R, B> {
           log.trace("Executing batch {} of {} records", batchId, batch.size());
           final BulkResponse bulkRsp = bulkClient.execute(bulkReq);
           if (bulkRsp.isSucceeded()) {
+            //Finished inserting records
+            metrics.incSuccessfulIndexedDocuments(batch.size());
+            insertLatency(startInstant);
+
             return bulkRsp;
           }
           retriable = bulkRsp.isRetriable();
@@ -356,11 +378,17 @@ public class BulkProcessor<R, B> {
             log.warn("Failed to execute batch {} of {} records, retrying after {} ms", batchId, batch.size(), retryBackoffMs, e);
             time.sleep(retryBackoffMs);
           } else {
+            insertLatency(startInstant);
             log.error("Failed to execute batch {} of {} records", batchId, batch.size(), e);
             throw e;
           }
         }
       }
+    }
+
+    private void insertLatency(Instant startInstant) {
+      double latencySecs = (clock.millis() - startInstant.toEpochMilli()) / (double) 1000;
+      metrics.observeIndexingLatency(latencySecs);
     }
 
   }
