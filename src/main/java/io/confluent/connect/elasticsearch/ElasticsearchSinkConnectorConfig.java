@@ -50,6 +50,7 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
   public static final String CUSTOM_DOCUMENT_TRANSFORMER_CONFIG = "custom.document.transformer";
   public static final String MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG = "max.idle.connection.timeout.ms";
   public static final String SCHEMA_FIELD_MAP_OVERRIDES_CONFIG = "schema.field.map.overrides";
+  public static final String CUSTOM_METRICS_CONFIG = "custom.metrics";
 
 
   protected static ConfigDef baseConfigDef() {
@@ -140,7 +141,10 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
                   + "Valid values are `" + CREATE_INDEX_AT_OPEN + "` or `" + CREATE_INDEX_AT_WRITE + "`.")
           .define(CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, Type.CLASS, null, Importance.LOW,
                   "The class to use to perform any final transformations on documents after conversion to JSON.",
-                  group, ++order, Width.SHORT, "Custom Document Transformer Class");
+                  group, ++order, Width.SHORT, "Custom Document Transformer Class")
+          .define(CUSTOM_METRICS_CONFIG, Type.CLASS, null, Importance.LOW,
+              "The class to use to gather Elasticsearch metrics.",
+              group, ++order, Width.LONG, "Custom Metrics Class");
     }
 
     return configDef;

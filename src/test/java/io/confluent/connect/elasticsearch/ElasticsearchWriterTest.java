@@ -335,6 +335,7 @@ public class ElasticsearchWriterTest extends ElasticsearchSinkTestBase {
         .setMaxRetry(30)
         .setIndexConfigurationProvider(indexConfigurationProvider)
         .setFieldTypes(ElasticsearchSinkTask.getDataTypes(null))
+        .setMetrics(new Metrics())
         .build();
 
     writer.start();

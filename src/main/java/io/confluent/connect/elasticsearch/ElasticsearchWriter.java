@@ -61,6 +61,7 @@ public class ElasticsearchWriter {
   private HashMap<String, Integer> currentIndexTotals = new HashMap<>();
   private long lastReport = 0;
   private Map<Schema.Type, String> fieldTypes = null;
+  private final Metrics metrics;
 
   ElasticsearchWriter(
       JestClient client,
@@ -79,7 +80,8 @@ public class ElasticsearchWriter {
       long retryBackoffMs,
       IndexConfigurationProvider indexConfigurationProvider,
       CustomDocumentTransformer customDocumentTransformer,
-      Map<Schema.Type, String> fieldTypes
+      Map<Schema.Type, String> fieldTypes,
+      Metrics metrics
   ) {
     this.client = client;
     this.type = type;
@@ -92,6 +94,9 @@ public class ElasticsearchWriter {
     this.indexConfigurationProvider = indexConfigurationProvider;
     this.customDocumentTransformer = customDocumentTransformer;
     this.fieldTypes = fieldTypes;
+    this.metrics = metrics;
+
+    metrics.setIndexBufferMax(maxBufferedRecords);
 
     bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -101,7 +106,8 @@ public class ElasticsearchWriter {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     existingMappings = new HashSet<>();
@@ -125,6 +131,7 @@ public class ElasticsearchWriter {
     private IndexConfigurationProvider indexConfigurationProvider;
     private CustomDocumentTransformer customDocumentTransformer;
     private Map<Schema.Type, String> fieldTypes = null;
+    private Metrics metrics;
 
     public Builder(JestClient client) {
       this.client = client;
@@ -142,6 +149,11 @@ public class ElasticsearchWriter {
 
     public Builder setFieldTypes(Map<Schema.Type, String> fieldTypes) {
       this.fieldTypes = fieldTypes;
+      return this;
+    }
+
+    public Builder setMetrics(Metrics metrics) {
+      this.metrics = metrics;
       return this;
     }
 
@@ -220,7 +232,8 @@ public class ElasticsearchWriter {
           retryBackoffMs,
           indexConfigurationProvider,
           customDocumentTransformer,
-          fieldTypes
+          fieldTypes,
+          metrics
       );
     }
   }

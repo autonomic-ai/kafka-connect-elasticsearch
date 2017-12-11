@@ -6,7 +6,7 @@
 
     <groupId>io.confluent</groupId>
     <artifactId>kafka-connect-elasticsearch</artifactId>
-    <version>3.5.0.1au-SNAPSHOT</version>
+    <version>3.5.0.2au-SNAPSHOT</version>
 
     <parent>
         <groupId>com.autonomic</groupId>
@@ -199,8 +199,8 @@
                 <version>2.5.1</version>
                 <inherited>true</inherited>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
