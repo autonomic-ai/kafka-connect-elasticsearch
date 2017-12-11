@@ -88,7 +88,11 @@ public class ElasticsearchSinkTask extends SinkTask {
       IndexConfigurationProvider indexConfigurationProvider = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.INDEX_CONFIGURATION_PROVIDER_CONFIG, IndexConfigurationProvider.class);
       indexCreationStrategy = config.getString(ElasticsearchSinkConnectorConfig.INDEX_CREATION_STRATEGY_CONFIG);
       CustomDocumentTransformer customDocumentTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, CustomDocumentTransformer.class);
+      Metrics metrics = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_METRICS_CONFIG, Metrics.class);
       int idleConnectionTimeout = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG);
+
+      if (metrics == null)
+        metrics = new Metrics();
 
       switch (indexCreationStrategy) {
         case CREATE_INDEX_AT_OPEN:
@@ -100,9 +104,7 @@ public class ElasticsearchSinkTask extends SinkTask {
           indexCreationStrategy = CREATE_INDEX_AT_OPEN;
       }
 
-      loadPrimitiveTypes();
-
-      loadCustomMappingTypes(schemaToFieldMap);
+      loadDataTypes(schemaToFieldMap);
 
       if (client != null) {
         this.client = client;
@@ -133,13 +135,19 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setRetryBackoffMs(retryBackoffMs)
           .setMaxRetry(maxRetry)
           .setIndexConfigurationProvider(indexConfigurationProvider)
-          .setCustomDocumentTransformer(customDocumentTransformer);
+          .setCustomDocumentTransformer(customDocumentTransformer)
+          .setMetrics(metrics);
 
       writer = builder.build();
       writer.start();
     } catch (ConfigException e) {
       throw new ConnectException("Couldn't start ElasticsearchSinkTask due to configuration error:", e);
     }
+  }
+
+  synchronized private void loadDataTypes(Map<String, String> schemaToFieldMap) {
+    loadPrimitiveTypes();
+    loadCustomMappingTypes(schemaToFieldMap);
   }
 
   private static void loadCustomMappingTypes(Map<String, String> overrideEntries) {
@@ -151,7 +159,6 @@ public class ElasticsearchSinkTask extends SinkTask {
         }
       }
     }
-
   }
 
   // public for testing
@@ -166,10 +173,8 @@ public class ElasticsearchSinkTask extends SinkTask {
   }
 
   // public for testing
-  public static void reload(List<String> values) {
-
+  synchronized public static void reload(List<String> values) {
     loadPrimitiveTypes();
-
     loadCustomMappingTypes(parseMapConfigKeyToUpper(values));
   }
 

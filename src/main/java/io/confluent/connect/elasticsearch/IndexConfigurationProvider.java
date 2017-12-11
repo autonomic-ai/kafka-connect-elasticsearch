@@ -15,6 +15,9 @@
  **/
 package io.confluent.connect.elasticsearch;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import javafx.util.Pair;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.util.Map;
@@ -79,4 +82,10 @@ public interface IndexConfigurationProvider {
    * @return Map<String,String> Collection of field names to replace.
    */
   public Map<String, String> getTypeMapping();
+
+  /* Determine if there are per Index fields */
+  public Boolean hasGlobalIndexFields();
+
+  /* Array of ObjectNodes to be added in the per Index field region */
+  public ArrayList<Pair<String, ObjectNode>> getGlobalIndexFields();
 }

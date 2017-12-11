@@ -59,6 +59,7 @@ public class ElasticsearchWriter {
   private final static int MILLIS_PER_SECOND = 1000;
   private HashMap<String, Integer> currentIndexTotals = new HashMap<>();
   private long lastReport = 0;
+  private final Metrics metrics;
 
   ElasticsearchWriter(
       JestClient client,
@@ -76,7 +77,8 @@ public class ElasticsearchWriter {
       int maxRetries,
       long retryBackoffMs,
       IndexConfigurationProvider indexConfigurationProvider,
-      CustomDocumentTransformer customDocumentTransformer
+      CustomDocumentTransformer customDocumentTransformer,
+      Metrics metrics
   ) {
     this.client = client;
     this.type = type;
@@ -88,6 +90,9 @@ public class ElasticsearchWriter {
     this.flushTimeoutMs = flushTimeoutMs;
     this.indexConfigurationProvider = indexConfigurationProvider;
     this.customDocumentTransformer = customDocumentTransformer;
+    this.metrics = metrics;
+
+    metrics.setIndexBufferMax(maxBufferedRecords);
 
     bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -97,7 +102,8 @@ public class ElasticsearchWriter {
         batchSize,
         lingerMs,
         maxRetries,
-        retryBackoffMs
+        retryBackoffMs,
+        metrics
     );
 
     existingMappings = new HashSet<>();
@@ -120,6 +126,7 @@ public class ElasticsearchWriter {
     private long retryBackoffMs;
     private IndexConfigurationProvider indexConfigurationProvider;
     private CustomDocumentTransformer customDocumentTransformer;
+    private Metrics metrics;
 
     public Builder(JestClient client) {
       this.client = client;
@@ -132,6 +139,11 @@ public class ElasticsearchWriter {
 
     public Builder setCustomDocumentTransformer(CustomDocumentTransformer customDocumentTransformer) {
       this.customDocumentTransformer = customDocumentTransformer;
+      return this;
+    }
+
+    public Builder setMetrics(Metrics metrics) {
+      this.metrics = metrics;
       return this;
     }
 
@@ -209,7 +221,8 @@ public class ElasticsearchWriter {
           maxRetry,
           retryBackoffMs,
           indexConfigurationProvider,
-          customDocumentTransformer
+          customDocumentTransformer,
+          metrics
       );
     }
   }

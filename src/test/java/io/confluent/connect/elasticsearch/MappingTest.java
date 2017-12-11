@@ -17,12 +17,17 @@
 package io.confluent.connect.elasticsearch;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonObject;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import javafx.util.Pair;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -30,6 +35,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.test.InternalTestCluster;
 import org.junit.Assert;
@@ -65,9 +71,10 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     createIndex(INDEX);
     Schema schema = createSchema();
 
-    HashMap<String, String> typeMapping = new HashMap<String, String>(){{ put("boolean","my_type"); }};
+    CustomIndex customIndex = new CustomIndex();
+    customIndex.setTypeMapping(new HashMap<String, String>(){{ put("boolean","my_type"); }});
 
-    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+    JsonNode document = Mapping.inferMapping(schema, customIndex);
 
     Assert.assertTrue(document.toString().contains("keyword"));
     Assert.assertTrue(document.toString().contains("my_type"));
@@ -86,9 +93,10 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     createIndex(INDEX);
     Schema schema = createSchema();
 
-    HashMap<String, String> typeMapping = new HashMap<String, String>(){{ put("location","my_invalid_type"); }};
+    CustomIndex customIndex = new CustomIndex();
+    customIndex.setTypeMapping(new HashMap<String, String>(){{ put("location","my_invalid_type"); }});
 
-    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+    JsonNode document = Mapping.inferMapping(schema, customIndex);
 
     Assert.assertTrue(!document.toString().contains("keyword"));
     Assert.assertTrue(!document.toString().contains("my_invalid_type"));
@@ -107,17 +115,38 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     createIndex(INDEX);
     Schema schema = createSchema();
 
-    HashMap<String, String> typeMapping = new HashMap<String, String>()
-      {{ put("boolean","my_boolean");
-         put("decimal", "my_decimal");
-      }};
+    CustomIndex customIndex = new CustomIndex();
+    customIndex.setTypeMapping(new HashMap<String, String>(){{ {{ put("boolean","my_boolean");
+                                                                  put("decimal", "my_decimal");
+                                                                }}; }});
 
-    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+    JsonNode document = Mapping.inferMapping(schema, customIndex);
 
     Assert.assertTrue(document.toString().contains("keyword"));
     Assert.assertTrue(document.toString().contains("my_int"));
     Assert.assertTrue(document.toString().contains("my_boolean"));
     Assert.assertTrue(document.toString().contains("my_decimal"));
+
+    //Reset Primitive types
+    ElasticsearchSinkTask.loadPrimitiveTypes();
+  }
+
+  @Test
+  public void testCustomIndexExtensions() throws Exception {
+
+    InternalTestCluster cluster = ESIntegTestCase.internalCluster();
+    cluster.ensureAtLeastNumDataNodes(1);
+
+    createIndex(INDEX);
+    Schema schema = createSchema();
+
+    CustomIndexExtensions customIndex = new CustomIndexExtensions();
+    customIndex.setTypeMapping(new HashMap<String, String>(){{ put("timestamp","date@notAnalyzed"); }});
+
+    JsonNode document = Mapping.inferMapping(schema, customIndex);
+
+    Assert.assertTrue(document.toString().contains("_all"));
+    Assert.assertTrue(document.toString().contains("not_analyzed"));
 
     //Reset Primitive types
     ElasticsearchSinkTask.loadPrimitiveTypes();
@@ -204,4 +233,34 @@ public class MappingTest extends ElasticsearchSinkTestBase {
         assertEquals("\"" + ElasticsearchSinkTask.fieldTypes.get(schemaType) + "\"", type.toString());
     }
   }
+
+  class CustomIndex extends CustomIndexConfigurationProvider {
+
+    HashMap<String, String> typeMapping = null;
+
+    public void setTypeMapping(HashMap<String, String> typeMapping) {
+      this.typeMapping = typeMapping;
+    }
+
+    @Override
+    public Map<String, String> getTypeMapping() {
+      return typeMapping;
+    }
+  }
+
+  class CustomIndexExtensions extends CustomIndex {
+
+    @Override
+    public Boolean hasGlobalIndexFields() { return true; }
+
+    @Override
+    public ArrayList<Pair<String, ObjectNode>> getGlobalIndexFields() {
+      ArrayList<Pair<String, ObjectNode>> nodeArray = new ArrayList<Pair<String, ObjectNode>>();
+      ObjectNode subCustomTypeNode = JsonNodeFactory.instance.objectNode();
+      subCustomTypeNode.set("enabled", JsonNodeFactory.instance.textNode("false"));
+      nodeArray.add(new Pair<String, ObjectNode>("_all", subCustomTypeNode));
+      return nodeArray;
+    }
+  }
 }
+

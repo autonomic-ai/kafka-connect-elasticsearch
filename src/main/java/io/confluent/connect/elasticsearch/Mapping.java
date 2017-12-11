@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import javafx.util.Pair;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -58,19 +59,15 @@ public class Mapping {
    * @param schema The schema used to infer mapping.
    * @throws IOException
    */
-  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField, IndexConfigurationProvider indexConfigurationProvider) throws IOException {
+  public static void createMapping(JestClient client, String index, String type, Schema schema,
+      String documentRootField, IndexConfigurationProvider indexConfigurationProvider) throws IOException {
+
     ObjectNode obj = JsonNodeFactory.instance.objectNode();
 
-    Map<String, String> customMappings = null;
-
-    if (indexConfigurationProvider != null) {
-      customMappings = indexConfigurationProvider.getTypeMapping();
-    }
-
     if (schema.type() == Schema.Type.STRUCT && schema.field(documentRootField) != null) {
-      obj.set(type, inferMapping(schema.field(documentRootField).schema(), customMappings));
+      obj.set(type, inferMapping(schema.field(documentRootField).schema(), indexConfigurationProvider));
     } else {
-      obj.set(type, inferMapping(schema, customMappings));
+      obj.set(type, inferMapping(schema, indexConfigurationProvider));
     }
 
     PutMapping putMapping = new PutMapping.Builder(index, type, obj.toString()).build();
@@ -100,9 +97,26 @@ public class Mapping {
    * Infer mapping from the provided schema.
    * @param schema The schema used to infer mapping.
    */
-  public static JsonNode inferMapping(Schema schema, Map<String, String> fieldMapping) {
+  public static JsonNode inferMapping(Schema schema, IndexConfigurationProvider indexConfigurationProvider) {
+    return inferMapping(schema, indexConfigurationProvider, 0);
+  }
+
+  /**
+   * Infer mapping from the provided schema with nesting level.
+   * @param schema The schema used to infer mapping.
+   */
+  private static JsonNode inferMapping(Schema schema, IndexConfigurationProvider indexConfigurationProvider,
+      int nestingLevel) {
+
+    assert (nestingLevel >= 0);
+
     if (schema == null) {
       throw new DataException("Cannot infer mapping without schema.");
+    }
+
+    Map<String, String> fieldMapping = null;
+    if (indexConfigurationProvider != null) {
+      fieldMapping = indexConfigurationProvider.getTypeMapping();
     }
 
     // Handle logical types
@@ -127,27 +141,71 @@ public class Mapping {
     switch (schemaType) {
       case ARRAY:
         valueSchema = schema.valueSchema();
-        return inferMapping(valueSchema, fieldMapping);
+        return inferMapping(valueSchema, indexConfigurationProvider, nestingLevel + 1);
       case MAP:
         keySchema = schema.keySchema();
         valueSchema = schema.valueSchema();
+
         properties.set("properties", fields);
-        fields.set(MAP_KEY, inferMapping(keySchema, fieldMapping));
-        fields.set(MAP_VALUE, inferMapping(valueSchema, fieldMapping));
+        fields.set(MAP_KEY, inferMapping(keySchema, indexConfigurationProvider, nestingLevel + 1));
+        fields.set(MAP_VALUE, inferMapping(valueSchema, indexConfigurationProvider, nestingLevel + 1));
         return properties;
       case STRUCT:
+
+        if (fieldMapping != null) {
+          if (nestingLevel < 1) {
+            // add custom index fields
+            if (indexConfigurationProvider != null && indexConfigurationProvider.hasGlobalIndexFields()) {
+              for (Pair<String, ObjectNode> entry: indexConfigurationProvider.getGlobalIndexFields()) {
+                properties.set(entry.getKey(), entry.getValue());
+              }
+            }
+          } else {
+            properties.put("type", "nested");
+          }
+        }
+
         properties.set("properties", fields);
         for (Field field : schema.fields()) {
           String fieldName = field.name();
           Schema fieldSchema = field.schema();
 
+          // add custom type node if provided and attributes
           if (fieldMapping != null && fieldMapping.containsKey(fieldName)) {
+
+            String value = fieldMapping.get(fieldName);
+
             ObjectNode customTypeNode = JsonNodeFactory.instance.objectNode();
-            customTypeNode.set("type",
-                  JsonNodeFactory.instance.textNode(fieldMapping.get(fieldName)));
+            String customFieldName = fieldMapping.get(fieldName);
+
+            if (value.contains("@")) {
+              String[] fieldAttributes = value.split("@");
+
+              if (fieldAttributes.length == 0)
+                throw new DataException("Invalid custom field.");
+
+              customFieldName = fieldAttributes[0].trim();
+
+              customTypeNode.set("type",
+                  JsonNodeFactory.instance.textNode(customFieldName));
+
+
+              for (int i = 1; i < fieldAttributes.length; i++) {
+                String attribute = fieldAttributes[i].trim();
+                if (attribute.equals("notAnalyzed")) {
+                  customTypeNode.put("index", "not_analyzed");
+                }
+              }
+
+            } else {
+              customTypeNode.set("type",
+                  JsonNodeFactory.instance.textNode(customFieldName));
+            }
+
             fields.set(fieldName, customTypeNode);
+
           } else {
-            fields.set(fieldName, inferMapping(fieldSchema, fieldMapping));
+            fields.set(fieldName, inferMapping(fieldSchema, indexConfigurationProvider, nestingLevel + 1));
           }
         }
         return properties;
