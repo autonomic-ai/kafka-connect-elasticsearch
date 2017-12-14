@@ -48,7 +48,8 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
     createIndex(INDEX);
     Schema schema = createSchema();
-    Mapping.createMapping(client, INDEX, TYPE, schema, null, null);
+    Mapping.createMapping(client, INDEX, TYPE, schema, null,
+        null, ElasticsearchSinkConnectorConstants.DEFAULT_TYPES);
 
     JsonObject mapping = Mapping.getMapping(client, INDEX, TYPE);
     assertNotNull(mapping);
@@ -60,19 +61,16 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
     InternalTestCluster cluster = ESIntegTestCase.internalCluster();
     cluster.ensureAtLeastNumDataNodes(1);
-    ElasticsearchSinkTask.reload(Arrays.asList("string:keyword"));
+
     createIndex(INDEX);
     Schema schema = createSchema();
 
     HashMap<String, String> typeMapping = new HashMap<String, String>(){{ put("boolean","my_type"); }};
 
-    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+    JsonNode document = Mapping.inferMapping(schema, typeMapping, ElasticsearchSinkTask.getDataTypes(Arrays.asList("string:keyword")));
 
     Assert.assertTrue(document.toString().contains("keyword"));
     Assert.assertTrue(document.toString().contains("my_type"));
-
-    //Only reset Primitive types
-    ElasticsearchSinkTask.reload(null);
   }
 
   @Test
@@ -81,19 +79,15 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     InternalTestCluster cluster = ESIntegTestCase.internalCluster();
     cluster.ensureAtLeastNumDataNodes(1);
 
-    ElasticsearchSinkTask.reload(Arrays.asList("invalid:keyword"));
     createIndex(INDEX);
     Schema schema = createSchema();
 
     HashMap<String, String> typeMapping = new HashMap<String, String>(){{ put("location","my_invalid_type"); }};
 
-    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+    JsonNode document = Mapping.inferMapping(schema, typeMapping, ElasticsearchSinkTask.getDataTypes(Arrays.asList("invalid:keyword")));
 
     Assert.assertTrue(!document.toString().contains("keyword"));
     Assert.assertTrue(!document.toString().contains("my_invalid_type"));
-
-    //Only reset Primitive types
-    ElasticsearchSinkTask.reload(null);
   }
 
   @Test
@@ -102,7 +96,6 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     InternalTestCluster cluster = ESIntegTestCase.internalCluster();
     cluster.ensureAtLeastNumDataNodes(1);
 
-    ElasticsearchSinkTask.reload(Arrays.asList("string:keyword", "int8:my_int"));
     createIndex(INDEX);
     Schema schema = createSchema();
 
@@ -111,15 +104,12 @@ public class MappingTest extends ElasticsearchSinkTestBase {
          put("decimal", "my_decimal");
       }};
 
-    JsonNode document = Mapping.inferMapping(schema, typeMapping);
+    JsonNode document = Mapping.inferMapping(schema, typeMapping, ElasticsearchSinkTask.getDataTypes(Arrays.asList("string:keyword", "int8:my_int")));
 
     Assert.assertTrue(document.toString().contains("keyword"));
     Assert.assertTrue(document.toString().contains("my_int"));
     Assert.assertTrue(document.toString().contains("my_boolean"));
     Assert.assertTrue(document.toString().contains("my_decimal"));
-
-    //Only reset Primitive types
-    ElasticsearchSinkTask.reload(null);
   }
 
   protected Schema createSchema() {
@@ -200,7 +190,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
         }
         break;
       default:
-        assertEquals("\"" + ElasticsearchSinkTask.fieldTypes.get(schemaType) + "\"", type.toString());
+        assertEquals("\"" + ElasticsearchSinkConnectorConstants.DEFAULT_TYPES.get(schemaType) + "\"", type.toString());
     }
   }
 }

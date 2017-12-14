@@ -1,1 +1,2 @@
-./mvnw -Drat.skip=true package
+./mvnw package
+./mvnw deploy

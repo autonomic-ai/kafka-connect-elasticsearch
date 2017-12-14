@@ -17,6 +17,7 @@
 package io.confluent.connect.elasticsearch;
 
 import org.apache.kafka.common.utils.SystemTime;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
@@ -59,6 +60,7 @@ public class ElasticsearchWriter {
   private final static int MILLIS_PER_SECOND = 1000;
   private HashMap<String, Integer> currentIndexTotals = new HashMap<>();
   private long lastReport = 0;
+  private Map<Schema.Type, String> fieldTypes = null;
 
   ElasticsearchWriter(
       JestClient client,
@@ -76,7 +78,8 @@ public class ElasticsearchWriter {
       int maxRetries,
       long retryBackoffMs,
       IndexConfigurationProvider indexConfigurationProvider,
-      CustomDocumentTransformer customDocumentTransformer
+      CustomDocumentTransformer customDocumentTransformer,
+      Map<Schema.Type, String> fieldTypes
   ) {
     this.client = client;
     this.type = type;
@@ -88,6 +91,7 @@ public class ElasticsearchWriter {
     this.flushTimeoutMs = flushTimeoutMs;
     this.indexConfigurationProvider = indexConfigurationProvider;
     this.customDocumentTransformer = customDocumentTransformer;
+    this.fieldTypes = fieldTypes;
 
     bulkProcessor = new BulkProcessor<>(
         new SystemTime(),
@@ -120,6 +124,7 @@ public class ElasticsearchWriter {
     private long retryBackoffMs;
     private IndexConfigurationProvider indexConfigurationProvider;
     private CustomDocumentTransformer customDocumentTransformer;
+    private Map<Schema.Type, String> fieldTypes = null;
 
     public Builder(JestClient client) {
       this.client = client;
@@ -132,6 +137,11 @@ public class ElasticsearchWriter {
 
     public Builder setCustomDocumentTransformer(CustomDocumentTransformer customDocumentTransformer) {
       this.customDocumentTransformer = customDocumentTransformer;
+      return this;
+    }
+
+    public Builder setFieldTypes(Map<Schema.Type, String> fieldTypes) {
+      this.fieldTypes = fieldTypes;
       return this;
     }
 
@@ -209,7 +219,8 @@ public class ElasticsearchWriter {
           maxRetry,
           retryBackoffMs,
           indexConfigurationProvider,
-          customDocumentTransformer
+          customDocumentTransformer,
+          fieldTypes
       );
     }
   }
@@ -233,7 +244,7 @@ public class ElasticsearchWriter {
       if (!ignoreSchema && !existingMappings.contains(index)) {
         try {
           if (Mapping.getMapping(client, index, type) == null) {
-            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), documentRootField, indexConfigurationProvider);
+            Mapping.createMapping(client, index, type, sinkRecord.valueSchema(), documentRootField, indexConfigurationProvider, fieldTypes);
           }
         } catch (IOException e) {
           // FIXME: concurrent tasks could attempt to create the mapping and one of the requests may fail
