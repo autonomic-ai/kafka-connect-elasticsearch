@@ -58,7 +58,15 @@ public class Mapping {
    * @param schema The schema used to infer mapping.
    * @throws IOException
    */
-  public static void createMapping(JestClient client, String index, String type, Schema schema, String documentRootField, IndexConfigurationProvider indexConfigurationProvider) throws IOException {
+  public static void createMapping(
+      JestClient client,
+      String index, String type,
+      Schema schema,
+      String documentRootField,
+      IndexConfigurationProvider indexConfigurationProvider,
+      Map<Schema.Type, String> fieldTypes
+  ) throws IOException {
+
     ObjectNode obj = JsonNodeFactory.instance.objectNode();
 
     Map<String, String> customMappings = null;
@@ -68,9 +76,9 @@ public class Mapping {
     }
 
     if (schema.type() == Schema.Type.STRUCT && schema.field(documentRootField) != null) {
-      obj.set(type, inferMapping(schema.field(documentRootField).schema(), customMappings));
+      obj.set(type, inferMapping(schema.field(documentRootField).schema(), customMappings, fieldTypes));
     } else {
-      obj.set(type, inferMapping(schema, customMappings));
+      obj.set(type, inferMapping(schema, customMappings, fieldTypes));
     }
 
     PutMapping putMapping = new PutMapping.Builder(index, type, obj.toString()).build();
@@ -96,11 +104,18 @@ public class Mapping {
     return mappingsJson.getAsJsonObject(type);
   }
 
+  public static JsonNode inferMapping(Schema schema, Map<String, String> fieldMapping) {
+    return inferMapping(schema, fieldMapping, ElasticsearchSinkConnectorConstants.DEFAULT_TYPES);
+  }
+
   /**
    * Infer mapping from the provided schema.
    * @param schema The schema used to infer mapping.
    */
-  public static JsonNode inferMapping(Schema schema, Map<String, String> fieldMapping) {
+  public static JsonNode inferMapping(Schema schema, Map<String, String> fieldMapping, Map<Schema.Type, String> fieldTypes) {
+
+    assert (fieldTypes != null);
+
     if (schema == null) {
       throw new DataException("Cannot infer mapping without schema.");
     }
@@ -127,13 +142,13 @@ public class Mapping {
     switch (schemaType) {
       case ARRAY:
         valueSchema = schema.valueSchema();
-        return inferMapping(valueSchema, fieldMapping);
+        return inferMapping(valueSchema, fieldMapping, fieldTypes);
       case MAP:
         keySchema = schema.keySchema();
         valueSchema = schema.valueSchema();
         properties.set("properties", fields);
-        fields.set(MAP_KEY, inferMapping(keySchema, fieldMapping));
-        fields.set(MAP_VALUE, inferMapping(valueSchema, fieldMapping));
+        fields.set(MAP_KEY, inferMapping(keySchema, fieldMapping, fieldTypes));
+        fields.set(MAP_VALUE, inferMapping(valueSchema, fieldMapping, fieldTypes));
         return properties;
       case STRUCT:
         properties.set("properties", fields);
@@ -147,12 +162,12 @@ public class Mapping {
                   JsonNodeFactory.instance.textNode(fieldMapping.get(fieldName)));
             fields.set(fieldName, customTypeNode);
           } else {
-            fields.set(fieldName, inferMapping(fieldSchema, fieldMapping));
+            fields.set(fieldName, inferMapping(fieldSchema, fieldMapping, fieldTypes));
           }
         }
         return properties;
       default:
-        return inferPrimitive(ElasticsearchSinkTask.fieldTypes.get(schemaType), defaultValue);
+        return inferPrimitive(fieldTypes.get(schemaType), defaultValue);
     }
   }
 

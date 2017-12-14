@@ -45,7 +45,7 @@ public class ElasticsearchSinkTask extends SinkTask {
   public static final String CREATE_INDEX_AT_WRITE = "atWrite";
   public static final int DISABLE_MAX_IDLE_CONNECTION_TIMEOUT = -1;
 
-  public static Map<Schema.Type, String> fieldTypes = new HashMap<>();
+  public Map<Schema.Type, String> fieldTypes = new HashMap<>();
 
   private static final Logger log = LoggerFactory.getLogger(ElasticsearchSinkTask.class);
   private ElasticsearchWriter writer;
@@ -100,9 +100,7 @@ public class ElasticsearchSinkTask extends SinkTask {
           indexCreationStrategy = CREATE_INDEX_AT_OPEN;
       }
 
-      loadPrimitiveTypes();
-
-      loadCustomMappingTypes(schemaToFieldMap);
+      loadDataTypes(schemaToFieldMap, fieldTypes);
 
       if (client != null) {
         this.client = client;
@@ -133,7 +131,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setRetryBackoffMs(retryBackoffMs)
           .setMaxRetry(maxRetry)
           .setIndexConfigurationProvider(indexConfigurationProvider)
-          .setCustomDocumentTransformer(customDocumentTransformer);
+          .setCustomDocumentTransformer(customDocumentTransformer)
+          .setFieldTypes(fieldTypes);
 
       writer = builder.build();
       writer.start();
@@ -142,36 +141,46 @@ public class ElasticsearchSinkTask extends SinkTask {
     }
   }
 
-  private static void loadCustomMappingTypes(Map<String, String> overrideEntries) {
+  // public for testing
+  public static Map<Schema.Type, String> getDataTypes(List<String> values) {
+    Map<String, String> overrideEntries = null;
+    if (values != null) {
+      overrideEntries = parseMapConfigKeyToUpper(values);
+    }
+    HashMap<Schema.Type, String> dataTypes = new HashMap<Schema.Type, String>();
+    loadDataTypes(overrideEntries, dataTypes);
+
+    return dataTypes;
+  }
+
+  private static void loadDataTypes(Map<String, String> schemaToFieldMap, Map<Schema.Type, String> dataTypes) {
+    loadPrimitiveTypes(dataTypes);
+
+    if (schemaToFieldMap != null) {
+      loadCustomMappingTypes(schemaToFieldMap, dataTypes);
+    }
+  }
+
+  private static void loadPrimitiveTypes(Map<Schema.Type, String> dataTypes) {
+
+    assert  (dataTypes != null);
+
+    // set default schema type -> ES field type map
+    for (Map.Entry<Schema.Type, String> entry : DEFAULT_TYPES.entrySet()) {
+      dataTypes.put(entry.getKey(), entry.getValue());
+    }
+  }
+
+  private static void loadCustomMappingTypes(Map<String, String> overrideEntries, Map<Schema.Type, String> dataTypes) {
 
     if (overrideEntries != null && overrideEntries.size() > 0) {
-      for (Map.Entry<Schema.Type, String> typeEntry : fieldTypes.entrySet()) {
+      for (Map.Entry<Schema.Type, String> typeEntry : dataTypes.entrySet()) {
         if (overrideEntries.containsKey(typeEntry.getKey().toString().toUpperCase())) {
           typeEntry.setValue(overrideEntries.get(typeEntry.getKey().toString().toUpperCase()));
         }
       }
     }
 
-  }
-
-  // public for testing
-  private static void loadPrimitiveTypes() {
-
-    fieldTypes.clear();
-
-    // set default schema type -> ES field type map
-    for (Map.Entry<Schema.Type, String> entry : DEFAULT_TYPES.entrySet()) {
-      fieldTypes.put(entry.getKey(), entry.getValue());
-    }
-  }
-
-  public static void reload(List<String> values) {
-
-    loadPrimitiveTypes();
-
-    if (values !=  null) {
-      loadCustomMappingTypes(parseMapConfigKeyToUpper(values));
-    }
   }
 
   @Override
