@@ -17,7 +17,7 @@ package io.confluent.connect.elasticsearch;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
-import javafx.util.Pair;
+import java.util.Map.Entry;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.util.Map;
@@ -46,7 +46,7 @@ public interface IndexConfigurationProvider {
    * @return The index name to alias mapping, or null if no index alias
    * is to be generated.
    */
-  Map.Entry<String, String> getIndexAliasMapping(SinkRecord record);
+  Entry<String, String> getIndexAliasMapping(SinkRecord record);
 
   /**
    * Get the String to use as a document Id for the specified record.
@@ -87,5 +87,5 @@ public interface IndexConfigurationProvider {
   public Boolean hasGlobalIndexFields();
 
   /* Array of ObjectNodes to be added in the per Index field region */
-  public ArrayList<Pair<String, ObjectNode>> getGlobalIndexFields();
+  public ArrayList<Entry<String, ObjectNode>> getGlobalIndexFields();
 }

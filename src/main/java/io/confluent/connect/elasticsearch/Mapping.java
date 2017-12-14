@@ -22,7 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import javafx.util.Pair;
+import java.util.Map.Entry;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -172,7 +172,7 @@ public class Mapping {
           if (nestingLevel < 1) {
             // add custom index fields
             if (indexConfigurationProvider != null && indexConfigurationProvider.hasGlobalIndexFields()) {
-              for (Pair<String, ObjectNode> entry: indexConfigurationProvider.getGlobalIndexFields()) {
+              for (Entry<String, ObjectNode> entry: indexConfigurationProvider.getGlobalIndexFields()) {
                 properties.set(entry.getKey(), entry.getValue());
               }
             }
