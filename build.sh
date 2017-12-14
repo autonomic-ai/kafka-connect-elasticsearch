@@ -1,2 +1,1 @@
-./mvnw package
 ./mvnw deploy

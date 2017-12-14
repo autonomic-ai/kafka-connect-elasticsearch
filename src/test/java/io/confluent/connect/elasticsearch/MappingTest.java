@@ -21,11 +21,12 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonObject;
 
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import javafx.util.Pair;
+import java.util.Map.Entry;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -234,11 +235,11 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     public Boolean hasGlobalIndexFields() { return true; }
 
     @Override
-    public ArrayList<Pair<String, ObjectNode>> getGlobalIndexFields() {
-      ArrayList<Pair<String, ObjectNode>> nodeArray = new ArrayList<Pair<String, ObjectNode>>();
+    public ArrayList<Entry<String, ObjectNode>> getGlobalIndexFields() {
+      ArrayList<Entry<String, ObjectNode>> nodeArray = new ArrayList<Entry<String, ObjectNode>>();
       ObjectNode subCustomTypeNode = JsonNodeFactory.instance.objectNode();
       subCustomTypeNode.set("enabled", JsonNodeFactory.instance.textNode("false"));
-      nodeArray.add(new Pair<String, ObjectNode>("_all", subCustomTypeNode));
+      nodeArray.add(new SimpleEntry<String, ObjectNode>("_all", subCustomTypeNode));
       return nodeArray;
     }
   }

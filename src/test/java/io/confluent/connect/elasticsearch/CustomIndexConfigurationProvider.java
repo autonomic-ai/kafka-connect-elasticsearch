@@ -17,7 +17,7 @@ package io.confluent.connect.elasticsearch;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
-import javafx.util.Pair;
+import java.util.Map.Entry;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
 
@@ -73,7 +73,7 @@ public class CustomIndexConfigurationProvider implements IndexConfigurationProvi
   }
 
   @Override
-  public ArrayList<Pair<String, ObjectNode>> getGlobalIndexFields() {
+  public ArrayList<Entry<String, ObjectNode>> getGlobalIndexFields() {
     return null;
   }
 }
