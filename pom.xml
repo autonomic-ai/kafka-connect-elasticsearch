@@ -11,7 +11,7 @@
     <parent>
         <groupId>com.autonomic</groupId>
         <artifactId>au-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>0.0.1-SNAPSHOT</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -175,8 +175,8 @@
                                 <contextUrl>https://autonomic.jfrog.io/autonomic</contextUrl>
                                 <repoKey>libs-release-local</repoKey>
                                 <snapshotRepoKey>libs-snapshot-local</snapshotRepoKey>
-                                <username>build</username>
-                                <password>{{ARTIFACTORY_PASSWORD}}</password>
+                                <username>${artifactory.username}</username>
+                                <password>${artifactory.password}</password>
                             </publisher>
                             <deployProperties>
                                 <groupId>${project.groupId}</groupId>
