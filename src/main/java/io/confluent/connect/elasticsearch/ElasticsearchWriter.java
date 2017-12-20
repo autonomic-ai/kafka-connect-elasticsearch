@@ -16,6 +16,7 @@
 
 package io.confluent.connect.elasticsearch;
 
+import io.searchbox.client.JestClientFactory;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -42,9 +43,10 @@ import io.searchbox.indices.aliases.ModifyAliases;
 
 
 public class ElasticsearchWriter {
+
   private static final Logger log = LoggerFactory.getLogger(ElasticsearchWriter.class);
 
-  private final JestClient client;
+  private JestClient client;
   private final String type;
   private final boolean ignoreKey;
   private final Set<String> ignoreKeyTopics;
@@ -58,10 +60,12 @@ public class ElasticsearchWriter {
   private final Set<String> existingMappings;
   private final static int QUEUE_REPORT_INTERVAL = 30;
   private final static int MILLIS_PER_SECOND = 1000;
+  public  final static int MAX_NEW_CONNECTION_RETRIES = 3;
   private HashMap<String, Integer> currentIndexTotals = new HashMap<>();
   private long lastReport = 0;
   private Map<Schema.Type, String> fieldTypes = null;
   private final Metrics metrics;
+  private final JestClientFactory factory;
 
   ElasticsearchWriter(
       JestClient client,
@@ -81,7 +85,8 @@ public class ElasticsearchWriter {
       IndexConfigurationProvider indexConfigurationProvider,
       CustomDocumentTransformer customDocumentTransformer,
       Map<Schema.Type, String> fieldTypes,
-      Metrics metrics
+      Metrics metrics,
+      JestClientFactory factory
   ) {
     this.client = client;
     this.type = type;
@@ -95,6 +100,7 @@ public class ElasticsearchWriter {
     this.customDocumentTransformer = customDocumentTransformer;
     this.fieldTypes = fieldTypes;
     this.metrics = metrics;
+    this.factory = factory;
 
     metrics.setIndexBufferMax(maxBufferedRecords);
 
@@ -132,6 +138,7 @@ public class ElasticsearchWriter {
     private CustomDocumentTransformer customDocumentTransformer;
     private Map<Schema.Type, String> fieldTypes = null;
     private Metrics metrics;
+    private JestClientFactory factory = null;
 
     public Builder(JestClient client) {
       this.client = client;
@@ -144,6 +151,11 @@ public class ElasticsearchWriter {
 
     public Builder setCustomDocumentTransformer(CustomDocumentTransformer customDocumentTransformer) {
       this.customDocumentTransformer = customDocumentTransformer;
+      return this;
+    }
+
+    public Builder setClientFactory(JestClientFactory factory) {
+      this.factory = factory;
       return this;
     }
 
@@ -233,7 +245,8 @@ public class ElasticsearchWriter {
           indexConfigurationProvider,
           customDocumentTransformer,
           fieldTypes,
-          metrics
+          metrics,
+          factory
       );
     }
   }
@@ -319,13 +332,25 @@ public class ElasticsearchWriter {
   }
 
   private boolean indexExists(String index) {
-    Action action = new IndicesExists.Builder(index).build();
-    try {
-      JestResult result = client.execute(action);
-      return result.isSucceeded();
-    } catch (IOException e) {
-      throw new ConnectException(e);
+
+    int retries = 1;
+
+    while (retries < MAX_NEW_CONNECTION_RETRIES) {
+      Action action = new IndicesExists.Builder(index).build();
+      try {
+        JestResult result = client.execute(action);
+        return result.isSucceeded();
+      } catch (IOException e) {
+        // Reconnect client
+        if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
+          throw new ConnectException(e);
+        }
+        client = factory.getObject();
+        retries++;
+      }
     }
+
+    return false;
   }
 
   public void createIndicesForTopics(Set<String> assignedTopics) throws ConnectException {
