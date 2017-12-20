@@ -64,6 +64,11 @@ public class ElasticsearchSinkTask extends SinkTask {
 
   // public for testing
   public void start(Map<String, String> props, JestClient client) {
+    start(props, client, null);
+  }
+
+  // public for testing
+  public void start(Map<String, String> props, JestClient client, JestClientFactory factory) {
     try {
       log.info("Starting ElasticsearchSinkTask.");
 
@@ -110,7 +115,7 @@ public class ElasticsearchSinkTask extends SinkTask {
         this.client = client;
       } else {
         List<String> address = config.getList(ElasticsearchSinkConnectorConfig.CONNECTION_URL_CONFIG);
-        JestClientFactory factory = new JestClientFactory();
+        factory = new JestClientFactory();
         if (idleConnectionTimeout != DISABLE_MAX_IDLE_CONNECTION_TIMEOUT)
           factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).maxConnectionIdleTime(idleConnectionTimeout, TimeUnit.MILLISECONDS).multiThreaded(true).build());
         else
@@ -137,7 +142,8 @@ public class ElasticsearchSinkTask extends SinkTask {
           .setIndexConfigurationProvider(indexConfigurationProvider)
           .setCustomDocumentTransformer(customDocumentTransformer)
           .setFieldTypes(fieldTypes)
-          .setMetrics(metrics);
+          .setMetrics(metrics)
+          .setClientFactory(factory);
 
       writer = builder.build();
       writer.start();

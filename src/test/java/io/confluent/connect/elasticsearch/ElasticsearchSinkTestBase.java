@@ -54,18 +54,19 @@ public class ElasticsearchSinkTestBase extends ESIntegTestCase {
   protected static final TopicPartition TOPIC_PARTITION2 = new TopicPartition(TOPIC, PARTITION2);
   protected static final TopicPartition TOPIC_PARTITION3 = new TopicPartition(TOPIC, PARTITION3);
 
-  protected JestHttpClient client;
+  protected MockJestClient client;
+  protected JestClientFactory factory = null;
 
   @Before
   public void setUp() throws Exception {
     super.setUp();
-    final JestClientFactory factory = new JestClientFactory();
+    factory = new JestClientFactory();
     factory.setHttpClientConfig(
         new HttpClientConfig
             .Builder("http://localhost:" + getPort())
             .multiThreaded(true).build()
     );
-    client = (JestHttpClient) factory.getObject();
+    client = new MockJestClient(factory.getObject(), false);
   }
 
   @After

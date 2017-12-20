@@ -50,12 +50,13 @@ public class ElasticsearchSinkTaskTest extends ElasticsearchSinkTestBase {
 
   @Test
   public void testPutAndFlush() throws Exception {
+    client.setException(true);
     InternalTestCluster cluster = ESIntegTestCase.internalCluster();
     cluster.ensureAtLeastNumDataNodes(3);
     Map<String, String> props = createProps();
 
     ElasticsearchSinkTask task = new ElasticsearchSinkTask();
-    task.start(props, client);
+    task.start(props, client, factory);
     task.open(new HashSet<>(Arrays.asList(TOPIC_PARTITION, TOPIC_PARTITION2, TOPIC_PARTITION3)));
 
     String key = "key";
@@ -75,10 +76,12 @@ public class ElasticsearchSinkTaskTest extends ElasticsearchSinkTestBase {
     refresh();
 
     verifySearchResults(records, true, false);
+    client.setException(false);
   }
 
   @Test
   public void testPutAndFlushWithIndexConfigurationProvider() throws Exception {
+    client.setException(true);
     InternalTestCluster cluster = ESIntegTestCase.internalCluster();
     cluster.ensureAtLeastNumDataNodes(3);
     Map<String, String> props = createProps();
@@ -88,7 +91,7 @@ public class ElasticsearchSinkTaskTest extends ElasticsearchSinkTestBase {
     props.put(INDEX_CREATION_STRATEGY_CONFIG, "atWrite");
 
     ElasticsearchSinkTask task = new ElasticsearchSinkTask();
-    task.start(props, client);
+    task.start(props, client, factory);
     task.open(new HashSet<>(Arrays.asList(TOPIC_PARTITION, TOPIC_PARTITION2, TOPIC_PARTITION3)));
 
     Schema schema = SchemaBuilder.struct().name("record")
@@ -114,5 +117,6 @@ public class ElasticsearchSinkTaskTest extends ElasticsearchSinkTestBase {
     refresh();
 
     verifySearchResults(records, customIndexConfigurationProvider.getIndexName(sinkRecord), true, false, customIndexConfigurationProvider);
+    client.setException(false);
   }
 }
