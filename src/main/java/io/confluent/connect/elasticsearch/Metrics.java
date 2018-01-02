@@ -25,7 +25,7 @@ public class Metrics {
    * Capture starting time of record added to the buffer.
    * @return Custom timer object
    */
-  public Object startIndexingBlockTimer() {
+  public synchronized Object startIndexingBlockTimer() {
     return null;
   }
 
@@ -33,34 +33,34 @@ public class Metrics {
    * Record the time a record was on hold to be added to the indexing buffer.
    * @param timer Custom timer.
    */
-  public void observeIndexingBlockTime(Object timer) {
+  public synchronized void observeIndexingBlockTime(Object timer) {
   }
 
   /**
    * Record the time needed to process a record in Elasticsearch
    * @param latencySecs Provide record indexing seconds.
    */
-  public void observeIndexingLatency(double latencySecs) {
+  public synchronized void observeIndexingLatency(double latencySecs) {
   }
 
   /**
    * Set the size of the record buffer at.
    * @param amount Size of buffer at the time.
    */
-  public void setIndexBufferUsed(double amount) {
+  public synchronized void setIndexBufferUsed(double amount) {
   }
 
   /**
    * Set the maximum buffer size.
    * @param amount Maximum buffer size.
    */
-  public void setIndexBufferMax(double amount) {
+  public synchronized void setIndexBufferMax(double amount) {
   }
 
   /**
    * Record the number of successfully indexed documents in Elasticsearch.
    * @param increment
    */
-  public void incSuccessfulIndexedDocuments(int increment) {
+  public synchronized void incSuccessfulIndexedDocuments(int increment) {
   }
 }
