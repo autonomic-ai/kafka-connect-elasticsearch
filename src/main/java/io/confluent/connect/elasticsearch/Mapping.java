@@ -194,6 +194,9 @@ public class Mapping {
             ObjectNode customTypeNode = JsonNodeFactory.instance.objectNode();
             String customFieldName = fieldMapping.get(fieldName);
 
+            //'@' is used as a separator for specific field properties to match below
+            // Currently supported field properties are:
+            //     * notAnalyzed = "fieldname": { "type": "datatype", "index": "not_analyzed" }
             if (value.contains("@")) {
               String[] fieldAttributes = value.split("@");
 
@@ -208,6 +211,7 @@ public class Mapping {
 
               for (int i = 1; i < fieldAttributes.length; i++) {
                 String attribute = fieldAttributes[i].trim();
+                //Supported field properties in Schema
                 if (attribute.equals("notAnalyzed")) {
                   customTypeNode.put("index", "not_analyzed");
                 }
