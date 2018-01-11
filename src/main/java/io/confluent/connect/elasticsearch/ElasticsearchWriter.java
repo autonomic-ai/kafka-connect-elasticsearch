@@ -341,10 +341,11 @@ public class ElasticsearchWriter {
         JestResult result = client.execute(action);
         return result.isSucceeded();
       } catch (IOException e) {
-        // Reconnect client
         if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
           throw new ConnectException(e);
         }
+        // Reconnect client
+        client.shutdownClient();
         client = factory.getObject();
         retries++;
       }
@@ -370,13 +371,28 @@ public class ElasticsearchWriter {
                 new AddAliasMapping.Builder(entry.getKey(), entry.getValue())
                         .build())
                 .build();
-        try {
-          JestResult result = client.execute(modifyAliases);
-          if (!result.isSucceeded()) {
-            throw new ConnectException("Could not create alias " + entry.getValue() + " for index " + entry.getKey());
+
+        int retries = 1;
+        boolean keepRetrying = true;
+
+        while (retries < MAX_NEW_CONNECTION_RETRIES && keepRetrying) {
+          try {
+            JestResult result = client.execute(modifyAliases);
+            if (!result.isSucceeded()) {
+              throw new ConnectException(
+                  "Could not create alias " + entry.getValue() + " for index " + entry.getKey());
+            } else {
+              keepRetrying = false;
+            }
+          } catch (IOException e) {
+            if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
+              throw new ConnectException(e);
+            }
+            // Reconnect client
+            client.shutdownClient();
+            client = factory.getObject();
+            retries++;
           }
-        } catch (IOException e) {
-          throw new ConnectException(e);
         }
       }
     }
@@ -398,14 +414,29 @@ public class ElasticsearchWriter {
         } else {
           createIndex = new CreateIndex.Builder(index).build();
         }
-        try {
-          JestResult result = client.execute(createIndex);
-          if (!result.isSucceeded()) {
-            log.error("Unable to create index {}: ", index, result.getErrorMessage());
-            throw new ConnectException("Could not create index: " + index + ": " + result.getErrorMessage());
+
+        int retries = 1;
+        boolean keepRetrying = true;
+
+        while (retries < MAX_NEW_CONNECTION_RETRIES && keepRetrying) {
+          try {
+            JestResult result = client.execute(createIndex);
+            if (!result.isSucceeded()) {
+              log.error("Unable to create index {}: ", index, result.getErrorMessage());
+              throw new ConnectException(
+                  "Could not create index: " + index + ": " + result.getErrorMessage());
+            } else {
+              keepRetrying = false;
+            }
+          } catch (IOException e) {
+            if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
+              throw new ConnectException(e);
+            }
+            // Reconnect client
+            client.shutdownClient();
+            client = factory.getObject();
+            retries++;
           }
-        } catch (IOException e) {
-          throw new ConnectException(e);
         }
       }
     }
