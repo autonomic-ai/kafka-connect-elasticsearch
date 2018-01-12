@@ -60,7 +60,7 @@ public class ElasticsearchWriter {
   private final Set<String> existingMappings;
   private final static int QUEUE_REPORT_INTERVAL = 30;
   private final static int MILLIS_PER_SECOND = 1000;
-  public  final static int MAX_NEW_CONNECTION_RETRIES = 3;
+  public  final static int MAX_NEW_CONNECTION_ATTEMPTS = 2; // Will result in only 1 retry
   private HashMap<String, Integer> currentIndexTotals = new HashMap<>();
   private long lastReport = 0;
   private Map<Schema.Type, String> fieldTypes = null;
@@ -335,17 +335,17 @@ public class ElasticsearchWriter {
 
     int retries = 1;
 
-    while (retries < MAX_NEW_CONNECTION_RETRIES) {
+    while (retries < MAX_NEW_CONNECTION_ATTEMPTS) {
       Action action = new IndicesExists.Builder(index).build();
       try {
         JestResult result = client.execute(action);
         return result.isSucceeded();
       } catch (IOException e) {
-        if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
+        if (retries > MAX_NEW_CONNECTION_ATTEMPTS || factory == null) {
           throw new ConnectException(e);
         }
         // Reconnect client
-        client.shutdownClient();
+        // Will not shutdown client since other connections could still be alive
         client = factory.getObject();
         retries++;
       }
@@ -375,7 +375,7 @@ public class ElasticsearchWriter {
         int retries = 1;
         boolean keepRetrying = true;
 
-        while (retries < MAX_NEW_CONNECTION_RETRIES && keepRetrying) {
+        while (retries < MAX_NEW_CONNECTION_ATTEMPTS && keepRetrying) {
           try {
             JestResult result = client.execute(modifyAliases);
             if (!result.isSucceeded()) {
@@ -385,11 +385,11 @@ public class ElasticsearchWriter {
               keepRetrying = false;
             }
           } catch (IOException e) {
-            if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
+            if (retries > MAX_NEW_CONNECTION_ATTEMPTS || factory == null) {
               throw new ConnectException(e);
             }
             // Reconnect client
-            client.shutdownClient();
+            // Will not shutdown client since other connections could still be alive
             client = factory.getObject();
             retries++;
           }
@@ -418,7 +418,7 @@ public class ElasticsearchWriter {
         int retries = 1;
         boolean keepRetrying = true;
 
-        while (retries < MAX_NEW_CONNECTION_RETRIES && keepRetrying) {
+        while (retries < MAX_NEW_CONNECTION_ATTEMPTS && keepRetrying) {
           try {
             JestResult result = client.execute(createIndex);
             if (!result.isSucceeded()) {
@@ -429,11 +429,11 @@ public class ElasticsearchWriter {
               keepRetrying = false;
             }
           } catch (IOException e) {
-            if (retries > MAX_NEW_CONNECTION_RETRIES || factory == null) {
+            if (retries > MAX_NEW_CONNECTION_ATTEMPTS || factory == null) {
               throw new ConnectException(e);
             }
             // Reconnect client
-            client.shutdownClient();
+            // Will not shutdown client since other connections could still be alive
             client = factory.getObject();
             retries++;
           }

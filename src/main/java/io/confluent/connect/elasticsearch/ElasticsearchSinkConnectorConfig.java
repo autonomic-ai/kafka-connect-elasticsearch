@@ -108,16 +108,16 @@ public class ElasticsearchSinkConnectorConfig extends AbstractConfig {
                   "A Map which overrides default Kafka Schema field to index mapping field.",
                   group, ++order, Width.LONG, "Override Kafka Schema field to index map field")
           .define(MAX_TOTAL_CONNECTIONS_CONFIG, Type.INT, 40, Importance.LOW,
-              "The maximum number of connections that the Jest Client is allowed to create.",
+                  "The maximum number of connections that the Jest Client is allowed to create.",
               group, ++order, Width.SHORT, "Override Jest Client maximum total connections")
           .define(MAX_TOTAL_CONNECTIONS_PER_ROUTE_CONFIG, Type.INT, 4, Importance.LOW,
-              "Desire level of concurrency per route.",
+                  "Desire level of concurrency per route.",
               group, ++order, Width.SHORT, "Override maximum number of concurrent connections per route")
           .define(DISCOVERY_ENABLED_CONFIG, Type.BOOLEAN, true, Importance.LOW,
-              "Enabling node discovery will poll and update the list of servers in the client.",
+                 "Enabling node discovery will poll and update the list of servers in the client.",
               group, ++order, Width.SHORT, "Enable auto-node discovery.")
           .define(DISCOVERY_FREQUENCY_MS_CONFIG, Type.LONG, 60000, Importance.LOW,
-              "Discovery frequency polling in ms.");
+                 "Discovery frequency polling in ms.");
     }
 
     {
