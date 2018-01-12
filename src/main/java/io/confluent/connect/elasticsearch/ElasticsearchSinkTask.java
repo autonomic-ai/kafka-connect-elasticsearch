@@ -95,6 +95,11 @@ public class ElasticsearchSinkTask extends SinkTask {
       CustomDocumentTransformer customDocumentTransformer = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_DOCUMENT_TRANSFORMER_CONFIG, CustomDocumentTransformer.class);
       Metrics metrics = config.getConfiguredInstance(ElasticsearchSinkConnectorConfig.CUSTOM_METRICS_CONFIG, Metrics.class);
       int idleConnectionTimeout = config.getInt(ElasticsearchSinkConnectorConfig.MAX_IDLE_CONNECTION_TIMEOUT_MS_CONFIG);
+      int totalConnections = config.getInt(ElasticsearchSinkConnectorConfig.MAX_TOTAL_CONNECTIONS_CONFIG);
+      int perRouteConnections = config.getInt(ElasticsearchSinkConnectorConfig.MAX_TOTAL_CONNECTIONS_PER_ROUTE_CONFIG);
+      boolean discoveryEnabled = config.getBoolean(ElasticsearchSinkConnectorConfig.DISCOVERY_ENABLED_CONFIG);
+      long discoveryFreq = config.getLong(ElasticsearchSinkConnectorConfig.DISCOVERY_FREQUENCY_MS_CONFIG);
+
 
       if (metrics == null)
         metrics = new Metrics();
@@ -117,9 +122,24 @@ public class ElasticsearchSinkTask extends SinkTask {
         List<String> address = config.getList(ElasticsearchSinkConnectorConfig.CONNECTION_URL_CONFIG);
         factory = new JestClientFactory();
         if (idleConnectionTimeout != DISABLE_MAX_IDLE_CONNECTION_TIMEOUT)
-          factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).maxConnectionIdleTime(idleConnectionTimeout, TimeUnit.MILLISECONDS).multiThreaded(true).build());
+          factory.setHttpClientConfig(new HttpClientConfig.Builder(address)
+                                            .multiThreaded(true)
+                                            .maxTotalConnection(totalConnections)
+                                            .defaultMaxTotalConnectionPerRoute(perRouteConnections)
+                                            .discoveryEnabled(discoveryEnabled)
+                                            .discoveryFrequency(discoveryFreq, TimeUnit.MILLISECONDS)
+                                            .maxConnectionIdleTime(idleConnectionTimeout, TimeUnit.MILLISECONDS)
+                                            .readTimeout(socketReadTimeoutMs)
+                                            .build());
         else
-          factory.setHttpClientConfig(new HttpClientConfig.Builder(address).readTimeout(socketReadTimeoutMs).multiThreaded(true).build());
+          factory.setHttpClientConfig(new HttpClientConfig.Builder(address)
+                                            .multiThreaded(true)
+                                            .maxTotalConnection(totalConnections)
+                                            .defaultMaxTotalConnectionPerRoute(perRouteConnections)
+                                            .discoveryEnabled(discoveryEnabled)
+                                            .discoveryFrequency(discoveryFreq, TimeUnit.MILLISECONDS)
+                                            .readTimeout(socketReadTimeoutMs)
+                                            .build());
         this.client = factory.getObject();
       }
 
