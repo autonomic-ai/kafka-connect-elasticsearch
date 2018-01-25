@@ -422,9 +422,14 @@ public class ElasticsearchWriter {
           try {
             JestResult result = client.execute(createIndex);
             if (!result.isSucceeded()) {
-              log.error("Unable to create index {}: ", index, result.getErrorMessage());
-              throw new ConnectException(
-                  "Could not create index: " + index + ": " + result.getErrorMessage());
+              if (result.getErrorMessage().contains("index_already_exists_exception")) {
+                log.error("Index {} already exists: ", index, result.getErrorMessage());
+                keepRetrying = false;
+              } else {
+                log.error("Unable to create index {}: ", index, result.getErrorMessage());
+                throw new ConnectException(
+                    "Could not create index: " + index + ": " + result.getErrorMessage());
+              }
             } else {
               keepRetrying = false;
             }
