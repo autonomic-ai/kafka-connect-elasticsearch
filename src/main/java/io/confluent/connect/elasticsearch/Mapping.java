@@ -197,6 +197,7 @@ public class Mapping {
             //'@' is used as a separator for specific field properties to match below
             // Currently supported field properties are:
             //     * notAnalyzed = "fieldname": { "type": "datatype", "index": "not_analyzed" }
+            //     * dynamic = "fieldname": { "type": "object",  "dynamic":  true }
             if (value.contains("@")) {
               String[] fieldAttributes = value.split("@");
 
@@ -214,6 +215,8 @@ public class Mapping {
                 //Supported field properties in Schema
                 if (attribute.equals("notAnalyzed")) {
                   customTypeNode.put("index", "not_analyzed");
+                } else if (attribute.equals("dynamic")) {
+                  customTypeNode.put("dynamic", "true");
                 }
               }
 
