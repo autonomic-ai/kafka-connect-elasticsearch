@@ -176,6 +176,8 @@ public class Mapping {
                 properties.set(entry.getKey(), entry.getValue());
               }
             }
+          } else if (schemaName.contains("@object")) { // Allow for static nested object STRUCTs with @object annotation
+            properties.put("type", "object");
           } else {
             properties.put("type", "nested");
           }
