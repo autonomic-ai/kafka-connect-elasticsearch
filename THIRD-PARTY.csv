@@ -1,3 +1,4 @@
+"com.autonomic","logback-test","1.0.0","Autonomic Proprietary 1.0"
 "com.autonomic","platform-protos","0.0.2-SNAPSHOT","Autonomic Proprietary 1.0"
 "com.carrotsearch","hppc","0.7.1","Apache License, Version 2.0"
 "com.carrotsearch.randomizedtesting","randomizedtesting-runner","2.3.2","Apache License, Version 2.0"

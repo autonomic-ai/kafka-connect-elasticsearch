@@ -81,7 +81,7 @@ public interface IndexConfigurationProvider {
    * Perform any final customizations on the document's index.
    * @return Map<String,String> Collection of field names to replace.
    */
-  public Map<String, String> getTypeMapping();
+  public Map<String, Entry<String, Integer>> getTypeMapping();
 
   /* Determine if there are per Index fields */
   public Boolean hasGlobalIndexFields();
