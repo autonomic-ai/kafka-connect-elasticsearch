@@ -70,7 +70,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Schema schema = createSchema();
 
     CustomIndex customIndex = new CustomIndex();
-    customIndex.setTypeMapping(new HashMap<String, String>(){{ put("boolean","my_type"); }});
+    customIndex.setTypeMapping(new HashMap<String, Entry<String, Integer>>(){{ put("boolean", new SimpleEntry<String, Integer>("my_type", 0)); }});
     JsonNode document = Mapping.inferMapping(schema, ElasticsearchSinkTask.getDataTypes(Arrays.asList("string:keyword")), customIndex);
 
     Assert.assertTrue(document.toString().contains("keyword"));
@@ -87,7 +87,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Schema schema = createSchema();
 
     CustomIndex customIndex = new CustomIndex();
-    customIndex.setTypeMapping(new HashMap<String, String>(){{ put("location","my_invalid_type"); }});
+    customIndex.setTypeMapping(new HashMap<String, Entry<String, Integer>>(){{ put("location", new SimpleEntry<String, Integer>("my_invalid_type", 0)); }});
     JsonNode document = Mapping.inferMapping(schema, ElasticsearchSinkTask.getDataTypes(Arrays.asList("invalid:keyword")), customIndex);
 
     Assert.assertTrue(!document.toString().contains("keyword"));
@@ -104,8 +104,8 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Schema schema = createSchema();
 
     CustomIndex customIndex = new CustomIndex();
-    customIndex.setTypeMapping(new HashMap<String, String>(){{ {{ put("boolean","my_boolean");
-                                                                  put("decimal", "my_decimal");
+    customIndex.setTypeMapping(new HashMap<String, Entry<String, Integer>>(){{ {{ put("boolean",new SimpleEntry<String, Integer>("my_boolean", 0));
+                                                                  put("decimal", new SimpleEntry<String, Integer>("my_decimal", 0));
                                                                 }}; }});
     JsonNode document = Mapping.inferMapping(schema, ElasticsearchSinkTask.getDataTypes(Arrays.asList("string:keyword", "int8:my_int")), customIndex);
 
@@ -125,7 +125,7 @@ public class MappingTest extends ElasticsearchSinkTestBase {
     Schema schema = createSchema();
 
     CustomIndexExtensions customIndex = new CustomIndexExtensions();
-    customIndex.setTypeMapping(new HashMap<String, String>(){{ put("timestamp","date@notAnalyzed"); }});
+    customIndex.setTypeMapping(new HashMap<String, Entry<String, Integer>>(){{ put("timestamp",new SimpleEntry<String, Integer>("date@notAnalyzed", 0)); }});
 
     JsonNode document = Mapping.inferMapping(schema, customIndex);
 
@@ -217,14 +217,14 @@ public class MappingTest extends ElasticsearchSinkTestBase {
 
   class CustomIndex extends CustomIndexConfigurationProvider {
 
-    HashMap<String, String> typeMapping = null;
+    HashMap<String, Entry<String, Integer>> typeMapping = null;
 
-    public void setTypeMapping(HashMap<String, String> typeMapping) {
+    public void setTypeMapping(HashMap<String, Entry<String, Integer>> typeMapping) {
       this.typeMapping = typeMapping;
     }
 
     @Override
-    public Map<String, String> getTypeMapping() {
+    public Map<String, Entry<String, Integer>> getTypeMapping() {
       return typeMapping;
     }
   }

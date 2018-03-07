@@ -130,7 +130,7 @@ public class Mapping {
       throw new DataException("Cannot infer mapping without schema.");
     }
 
-    Map<String, String> fieldMapping = null;
+    Map<String, Entry<String, Integer>> fieldMapping = null;
     if (indexConfigurationProvider != null) {
       fieldMapping = indexConfigurationProvider.getTypeMapping();
     }
@@ -176,7 +176,8 @@ public class Mapping {
                 properties.set(entry.getKey(), entry.getValue());
               }
             }
-          } else if (schemaName.contains("@object")) { // Allow for static nested object STRUCTs with @object annotation
+          } else if (schemaName.contains("@object")) {
+            // Allow for static nested object STRUCTs with @object annotation
             properties.put("type", "object");
           } else {
             properties.put("type", "nested");
@@ -188,28 +189,37 @@ public class Mapping {
           String fieldName = field.name();
           Schema fieldSchema = field.schema();
 
+          // All nodes with a underscore prefix are ignored during index generation
+          if (fieldName.startsWith("_")) {
+            continue;
+          }
+
           // add custom type node if provided and attributes
           if (fieldMapping != null && fieldMapping.containsKey(fieldName)) {
 
-            String value = fieldMapping.get(fieldName);
-
             ObjectNode customTypeNode = JsonNodeFactory.instance.objectNode();
-            String customFieldName = fieldMapping.get(fieldName);
+            Entry<String, Integer> customFieldName = fieldMapping.get(fieldName);
+
+            // If nesting level does not match, treat as a normal entry
+            if (customFieldName.getValue() != nestingLevel) {
+              fields.set(fieldName, inferMapping(fieldSchema, fieldTypes, indexConfigurationProvider, nestingLevel + 1));
+              continue;
+            }
 
             //'@' is used as a separator for specific field properties to match below
             // Currently supported field properties are:
             //     * notAnalyzed = "fieldname": { "type": "datatype", "index": "not_analyzed" }
             //     * dynamic = "fieldname": { "type": "object",  "dynamic":  true }
-            if (value.contains("@")) {
-              String[] fieldAttributes = value.split("@");
+            if (customFieldName.getKey().contains("@")) {
+              String[] fieldAttributes = customFieldName.getKey().split("@");
 
               if (fieldAttributes.length == 0)
                 throw new DataException("Invalid custom field.");
 
-              customFieldName = fieldAttributes[0].trim();
+              String fieldname = fieldAttributes[0].trim();
 
               customTypeNode.set("type",
-                  JsonNodeFactory.instance.textNode(customFieldName));
+                  JsonNodeFactory.instance.textNode(fieldname));
 
 
               for (int i = 1; i < fieldAttributes.length; i++) {
@@ -224,7 +234,7 @@ public class Mapping {
 
             } else {
               customTypeNode.set("type",
-                  JsonNodeFactory.instance.textNode(customFieldName));
+                  JsonNodeFactory.instance.textNode(customFieldName.getKey()));
             }
 
             fields.set(fieldName, customTypeNode);

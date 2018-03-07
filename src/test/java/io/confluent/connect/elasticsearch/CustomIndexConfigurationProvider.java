@@ -63,7 +63,7 @@ public class CustomIndexConfigurationProvider implements IndexConfigurationProvi
   }
 
   @Override
-  public Map<String, String> getTypeMapping() {
+  public Map<String, Entry<String, Integer>> getTypeMapping() {
     return null;
   }
 
